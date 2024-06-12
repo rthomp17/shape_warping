@@ -34,7 +34,7 @@ shape_warping
 =============
 
 
-    Add a short description here!
+Code by Ondrej Biza and Skye Thompson
 
 
 A longer description of your project goes here...
