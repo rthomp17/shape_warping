@@ -108,7 +108,6 @@ def viz_part_models(warp_files, part_names):
         in_div = [html.P(f"{part}")]
         for i in range(n_components[part]):
             in_div += [
-                
                 html.P(f"Component {i}:"),
                 dcc.Slider(
                     part_means[part][i] - sample_range,
@@ -117,11 +116,17 @@ def viz_part_models(warp_files, part_names):
                     value=part_means[part][i],
                     marks=None,
                     id=f"Component_{past_num + i}",
-                )
+                ),
             ]
-        dashboard_features.append(html.Div(in_div, 
-            style={'width': f'{int(100/len(part_names)) - 1}%', 
-            'display': 'inline-block'}))
+        dashboard_features.append(
+            html.Div(
+                in_div,
+                style={
+                    "width": f"{int(100/len(part_names)) - 1}%",
+                    "display": "inline-block",
+                },
+            )
+        )
         past_num += n_components[part]
 
     dashboard_features += [
@@ -190,7 +195,7 @@ def viz_part_models(warp_files, part_names):
                     range=[-0.1, 0.1],
                 ),
             ),
-            uirevision= 'some-constant',
+            uirevision="some-constant",
         )
 
         fig.update_layout(scene_aspectmode="cube")
@@ -204,9 +209,11 @@ if __name__ == "__main__":
     # warp_file = "./example_data/example_pretrained"
     # viz_whole_model(warp_file)
 
-    part_names = ['body', 'spout', 'lid', 'handle']
-    part_files = {'body': "example_data/teapot_models/example_pretrained_body",
-			      'handle': "example_data/teapot_models/example_pretrained_handle", 
-			      'lid': "example_data/teapot_models/example_pretrained_lid",
-			      'spout':"example_data/teapot_models/example_pretrained_spout",}
+    part_names = ["body", "spout", "lid", "handle"]
+    part_files = {
+        "body": "example_data/teapot_models/example_pretrained_body",
+        "handle": "example_data/teapot_models/example_pretrained_handle",
+        "lid": "example_data/teapot_models/example_pretrained_lid",
+        "spout": "example_data/teapot_models/example_pretrained_spout",
+    }
     viz_part_models(part_files, part_names)

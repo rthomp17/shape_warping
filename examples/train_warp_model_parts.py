@@ -9,29 +9,30 @@ from shape_warping.warp_model_learning import learn_warps
 # Example of generating the warp model using the spatulas
 
 
-warp_training_part_ids = {'body': [
-    "./example_data/teapot_meshes/kettle_1/kettle_1_body.obj",
-    "./example_data/teapot_meshes/kettle_2/kettle_2_body.obj",
-    "./example_data/teapot_meshes/kettle_3/kettle_3_body.obj",
-    "./example_data/teapot_meshes/kettle_4/kettle_4_body.obj",
+warp_training_part_ids = {
+    "body": [
+        "./example_data/teapot_meshes/kettle_1/kettle_1_body.obj",
+        "./example_data/teapot_meshes/kettle_2/kettle_2_body.obj",
+        "./example_data/teapot_meshes/kettle_3/kettle_3_body.obj",
+        "./example_data/teapot_meshes/kettle_4/kettle_4_body.obj",
     ],
-    'spout': [
-    "./example_data/teapot_meshes/kettle_1/kettle_1_spout.obj",
-    "./example_data/teapot_meshes/kettle_2/kettle_2_spout.obj",
-    "./example_data/teapot_meshes/kettle_3/kettle_3_spout.obj",
-    "./example_data/teapot_meshes/kettle_4/kettle_4_spout.obj",
+    "spout": [
+        "./example_data/teapot_meshes/kettle_1/kettle_1_spout.obj",
+        "./example_data/teapot_meshes/kettle_2/kettle_2_spout.obj",
+        "./example_data/teapot_meshes/kettle_3/kettle_3_spout.obj",
+        "./example_data/teapot_meshes/kettle_4/kettle_4_spout.obj",
     ],
-    'handle': [
-    "./example_data/teapot_meshes/kettle_1/kettle_1_handle.obj",
-    "./example_data/teapot_meshes/kettle_2/kettle_2_handle.obj",
-    "./example_data/teapot_meshes/kettle_3/kettle_3_handle.obj",
-    "./example_data/teapot_meshes/kettle_4/kettle_4_handle.obj",
+    "handle": [
+        "./example_data/teapot_meshes/kettle_1/kettle_1_handle.obj",
+        "./example_data/teapot_meshes/kettle_2/kettle_2_handle.obj",
+        "./example_data/teapot_meshes/kettle_3/kettle_3_handle.obj",
+        "./example_data/teapot_meshes/kettle_4/kettle_4_handle.obj",
     ],
-    'lid': [
-    "./example_data/teapot_meshes/kettle_1/kettle_1_lid.obj",
-    "./example_data/teapot_meshes/kettle_2/kettle_2_lid.obj",
-    "./example_data/teapot_meshes/kettle_3/kettle_3_lid.obj",
-    "./example_data/teapot_meshes/kettle_4/kettle_4_lid.obj",
+    "lid": [
+        "./example_data/teapot_meshes/kettle_1/kettle_1_lid.obj",
+        "./example_data/teapot_meshes/kettle_2/kettle_2_lid.obj",
+        "./example_data/teapot_meshes/kettle_3/kettle_3_lid.obj",
+        "./example_data/teapot_meshes/kettle_4/kettle_4_lid.obj",
     ],
 }
 

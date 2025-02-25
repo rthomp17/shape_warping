@@ -1,4 +1,4 @@
-#Code by Ondrej Biza and Skye Thompson
+# Code by Ondrej Biza and Skye Thompson
 
 from ast import Call
 from typing import List, Optional, Tuple, Union, Callable
@@ -12,6 +12,7 @@ from torch import nn, optim
 from shape_warping import utils, viz_utils
 
 PARAM_1 = {"lr": 1e-2, "n_steps": 150, "n_samples": 1000, "object_size_reg": 0.01}
+
 
 def cost_batch_pt(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Calculate the one-sided Chamfer distance between two batches of point clouds in pytorch."""
@@ -644,9 +645,11 @@ class ObjectSE2Batch(ObjectWarping):
         )
         return (new_pcd,)
 
-    def subsample(
-        self, num_samples: int
-    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], torch.Tensor,]:
+    def subsample(self, num_samples: int) -> Tuple[
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+        torch.Tensor,
+    ]:
         """Randomly subsample the canonical object, including its PCA projection."""
         indices = np.random.randint(0, self.canonical_pcl.shape[0], num_samples)
         canonical_obj_pt_ = self.canonical_pcl[indices]

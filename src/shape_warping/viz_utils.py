@@ -1,4 +1,4 @@
-#Code by Ondrej Biza and Skye Thompson
+# Code by Ondrej Biza and Skye Thompson
 import copy
 from typing import Dict, List, Optional
 
@@ -8,15 +8,15 @@ from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 
 
-#Show point clouds from dictionary {name: pcd}
+# Show point clouds from dictionary {name: pcd}
 def show_pcds_plotly(
     pcds: Dict[str, NDArray],
     center: bool = False,
     axis_visible: bool = True,
     colors: Optional[Dict[str, str]] = None,
-    show_legend = True,
-    markers = None,
-    camera = None
+    show_legend=True,
+    markers=None,
+    camera=None,
 ):
     colorscales = [
         "Plotly3",
@@ -49,12 +49,13 @@ def show_pcds_plotly(
             colorscale = colorscales[idx % len(colorscales)]
 
         if markers is not None:
-            marker = markers[key] | {"color":v[:, 2], "colorscale": colorscale}
+            marker = markers[key] | {"color": v[:, 2], "colorscale": colorscale}
         else:
-            marker={"size": 5,
-                    "color": v[:, 2],
-                    "colorscale": colorscale,
-                        }
+            marker = {
+                "size": 5,
+                "color": v[:, 2],
+                "colorscale": colorscale,
+            }
 
         pl = go.Scatter3d(
             x=v[:, 0],
@@ -75,14 +76,15 @@ def show_pcds_plotly(
     fig = go.Figure(data=data)
     if camera is None:
         camera = fig.layout.scene.camera
-        camera.up =  dict(x=0, y=1, z=0)
+        camera.up = dict(x=0, y=1, z=0)
         camera.eye = dict(x=6.28, y=0, z=1)
     fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend)
 
     # fig.show()
     return fig
 
-#Show meshes from dictionary
+
+# Show meshes from dictionary
 def show_meshes_plotly(
     vertices: Dict[str, NDArray],
     faces: Dict[str, NDArray],
@@ -91,7 +93,7 @@ def show_meshes_plotly(
     camera: Optional[Dict[str, Dict[str, float]]] = None,
     show_legend: bool = True,
     show: bool = False,
-    pcds = None,
+    pcds=None,
 ):
     colorscales = [
         "Plotly3",
@@ -159,25 +161,31 @@ def show_meshes_plotly(
             )
             data.append(pl)
 
-    layout = {  "xaxis": {"visible": axis_visible, "range": [lmin, lmax]},
+    layout = {
+        "xaxis": {"visible": axis_visible, "range": [lmin, lmax]},
         "yaxis": {"visible": axis_visible, "range": [lmin, lmax]},
         "zaxis": {"visible": axis_visible, "range": [lmin, lmax]},
-        "aspectratio": {"x": 1, "y": 1, "z": 1},}
-    
+        "aspectratio": {"x": 1, "y": 1, "z": 1},
+    }
+
     fig = go.Figure(data=data)
     if camera is None:
         camera = fig.layout.scene.camera
-        camera.up =  dict(x=0, y=0, z=1)
-        camera.eye = dict(x=1.6, y=.6, z=.8)
+        camera.up = dict(x=0, y=0, z=1)
+        camera.eye = dict(x=1.6, y=0.6, z=0.8)
     fig.update_xaxes(showgrid=axis_visible)
     fig.update_yaxes(showgrid=axis_visible)
-    fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend, width=600, height=600)
+    fig.update_layout(
+        scene=layout, scene_camera=camera, showlegend=show_legend, width=600, height=600
+    )
     if show:
         fig.show()
 
     return fig
 
+
 from plotly.subplots import make_subplots
+
 
 # Show point clouds in a grid of subplots
 def show_pcd_grid_plotly(
@@ -185,10 +193,10 @@ def show_pcd_grid_plotly(
     cols,
     pcls: Dict[str, Dict[str, NDArray]],
     names: List[str],
-    subplot_titles = List[str],
+    subplot_titles=List[str],
     markers=None,
     camera_views: Optional[List[Dict[str, dict]]] = None,
-    get_images = False,
+    get_images=False,
     save_image: bool = False,
     save_path: bool = False,
 ):
@@ -196,8 +204,8 @@ def show_pcd_grid_plotly(
         rows=rows,
         cols=cols,
         specs=[[{"type": "scatter3d"} for i in range(cols)] for j in range(rows)],
-        horizontal_spacing = 0.00,
-        vertical_spacing = 0.00,
+        horizontal_spacing=0.00,
+        vertical_spacing=0.00,
         subplot_titles=subplot_titles,
     )
     layout = {}
@@ -209,19 +217,21 @@ def show_pcd_grid_plotly(
             name = names[row * cols + col]
 
             tmp = np.concatenate(list(pcls[name].values()), axis=0)
-            epsilon = .005
+            epsilon = 0.005
             lmin = np.min(tmp) - epsilon
             lmax = np.max(tmp) + epsilon
 
             for pcl_name in pcls[name].keys():
                 if markers is not None:
-                    marker = markers[name][pcl_name] | {'color': np.ones_like(pcls[name][pcl_name][:, 2]) * .5,}
+                    marker = markers[name][pcl_name] | {
+                        "color": np.ones_like(pcls[name][pcl_name][:, 2]) * 0.5,
+                    }
                 else:
-                    marker={
-                            "size": 5,
-                            "color": pcls[name][pcl_name][:, 2],
-                            "colorscale": 'viridis',
-                        }
+                    marker = {
+                        "size": 5,
+                        "color": pcls[name][pcl_name][:, 2],
+                        "colorscale": "viridis",
+                    }
                 fig.add_trace(
                     go.Scatter3d(
                         x=pcls[name][pcl_name][:, 0],
@@ -239,11 +249,18 @@ def show_pcd_grid_plotly(
                 "xaxis": {"visible": axis_visible, "range": [lmin, lmax]},
                 "yaxis": {"visible": axis_visible, "range": [lmin, lmax]},
                 "zaxis": {"visible": axis_visible, "range": [lmin, lmax]},
-                "aspectratio": {"x": 1, "y": 1, "z": 1},}
-            plot_index = row * cols + col + 1 if row * cols + col > 0 else ''
-            eval(f"fig.layout.scene{plot_index}.xaxis").update({"visible": axis_visible, "range": [lmin, lmax]})
-            eval(f"fig.layout.scene{plot_index}.yaxis").update({"visible": axis_visible, "range": [lmin, lmax]})
-            eval(f"fig.layout.scene{plot_index}.zaxis").update({"visible": axis_visible, "range": [lmin, lmax]})
+                "aspectratio": {"x": 1, "y": 1, "z": 1},
+            }
+            plot_index = row * cols + col + 1 if row * cols + col > 0 else ""
+            eval(f"fig.layout.scene{plot_index}.xaxis").update(
+                {"visible": axis_visible, "range": [lmin, lmax]}
+            )
+            eval(f"fig.layout.scene{plot_index}.yaxis").update(
+                {"visible": axis_visible, "range": [lmin, lmax]}
+            )
+            eval(f"fig.layout.scene{plot_index}.zaxis").update(
+                {"visible": axis_visible, "range": [lmin, lmax]}
+            )
 
     fig.update_annotations(font_size=25)
     fw = go.FigureWidget(fig)
@@ -261,13 +278,12 @@ def show_pcd_grid_plotly(
 
     fw.update_layout(scene=layout, height=1000, width=1000)
 
-
-
     if save_image:
         fw.write_image(save_path)
 
     fw.show()
     return fw
+
 
 def plotly_fig2array(fig):
     # convert Plotly fig to  an array
@@ -275,6 +291,7 @@ def plotly_fig2array(fig):
     buf = io.BytesIO(fig_bytes)
     img = Image.open(buf)
     return np.asarray(img)
+
 
 # Turns a slider fig into a video
 # Every frame should be a point cloud
@@ -286,7 +303,7 @@ def show_pcds_video_animation_plotly(
     file_name: str,
 ):
 
-    #Additional imports for video generation
+    # Additional imports for video generation
     import moviepy.editor as mpy
     import io
     import copy as cp
@@ -298,14 +315,17 @@ def show_pcds_video_animation_plotly(
 
     fig = go.Figure()
 
-    fig.layout.scene.update(dict(aspectmode='cube', 
-                    xaxis = dict(range = [-.1,.1], visible=False),
-                    yaxis = dict(range = [-.1,.1], visible=False),
-                    zaxis = dict(range = [-.1,.1], visible=False),
-                      aspectratio=dict(x=1, y=1, z=0.95)))
+    fig.layout.scene.update(
+        dict(
+            aspectmode="cube",
+            xaxis=dict(range=[-0.1, 0.1], visible=False),
+            yaxis=dict(range=[-0.1, 0.1], visible=False),
+            zaxis=dict(range=[-0.1, 0.1], visible=False),
+            aspectratio=dict(x=1, y=1, z=0.95),
+        )
+    )
 
-    camera = dict(
-    eye=dict(x=1.25, y=0., z=0.))
+    camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
 
     fig.update_layout(scene_camera=camera)
 
@@ -354,7 +374,8 @@ def show_pcds_video_animation_plotly(
         for j in range(len(moving_pcl_frames)):
             for part in moving_pcl_frames[j].keys():
                 fig.update_traces(
-                    visible=False, selector=dict(name=f"{moving_pcl_name} {part}, Step {j}")
+                    visible=False,
+                    selector=dict(name=f"{moving_pcl_name} {part}, Step {j}"),
                 )
 
         for part in moving_pcl_frames[i].keys():
@@ -367,6 +388,7 @@ def show_pcds_video_animation_plotly(
     animation = mpy.VideoClip(make_frame, duration=1)
     animation.write_gif(f"{file_name}.gif", fps=20)
 
+
 # Slider animation showing a series of point clouds as frames
 def show_pcds_slider_animation_plotly(
     moving_pcl_name: str,
@@ -375,14 +397,17 @@ def show_pcds_slider_animation_plotly(
     step_names: List[str],
 ):
     fig = go.Figure()
-    fig.layout.scene.update(dict(aspectmode='cube', 
-                    xaxis = dict(range = [-.1,.1], visible=False),
-                    yaxis = dict(range = [-.1,.1], visible=False),
-                    zaxis = dict(range = [-.1,.1], visible=False),
-                      aspectratio=dict(x=1, y=1, z=0.95)))
+    fig.layout.scene.update(
+        dict(
+            aspectmode="cube",
+            xaxis=dict(range=[-0.1, 0.1], visible=False),
+            yaxis=dict(range=[-0.1, 0.1], visible=False),
+            zaxis=dict(range=[-0.1, 0.1], visible=False),
+            aspectratio=dict(x=1, y=1, z=0.95),
+        )
+    )
 
-    camera = dict(
-        eye=dict(x=1.25, y=0., z=0.))
+    camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
 
     fig.update_layout(scene_camera=camera)
 
@@ -449,6 +474,7 @@ def show_pcds_slider_animation_plotly(
     # fig.show()
     return fig
 
+
 def transform_pcd(pcd, trans, is_position: bool = True):
     n = pcd.shape[0]
     cloud = cp.deepcopy(pcd.T)
@@ -484,7 +510,7 @@ def generate_slider_viz(
             step_names=step_names,
             file_name=experiment_id,
         )
-    
+
     slider_fig = show_pcds_slider_animation_plotly(
         moving_pcl_name="Source",
         moving_pcl_frames=best_transforms,
@@ -492,4 +518,3 @@ def generate_slider_viz(
         step_names=step_names,
     )
     return slider_fig
-

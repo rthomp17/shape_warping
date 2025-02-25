@@ -1,4 +1,4 @@
-#Code by Ondrej Biza and Skye Thompson
+# Code by Ondrej Biza and Skye Thompson
 
 import pickle
 from dataclasses import dataclass

@@ -66,13 +66,13 @@ viz_utils.show_pcds_plotly(
 # See the meshes
 viz_utils.show_meshes_plotly(
     {
-        #"Source (Canonical) Mesh": warp_model.mesh_vertices,
-        #"Target Mesh": test_object.vertices,
+        # "Source (Canonical) Mesh": warp_model.mesh_vertices,
+        # "Target Mesh": test_object.vertices,
         "Reconstruction": warp_model.to_transformed_mesh(reconstr_params).vertices,
     },
     {
-        #"Source (Canonical) Mesh": warp_model.mesh_vertices,
-        #"Target Mesh": test_object.vertices,
+        # "Source (Canonical) Mesh": warp_model.mesh_vertices,
+        # "Target Mesh": test_object.vertices,
         "Reconstruction": warp_model.to_transformed_mesh(reconstr_params).faces,
-    }
+    },
 ).show()
