@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import numpy as np
 import pickle
-from utils import CanonPart, CanonPartMetadata
+from shape_warping.utils import CanonShape, CanonShapeMetadata
 
 
 def viz_whole_model(warp_file):
@@ -31,6 +31,7 @@ def viz_whole_model(warp_file):
                 latent_means[i] + sample_range,
                 sample_range / (num_ticks / 2),
                 value=latent_means[i],
+                marks=None,
                 id=f"Component_{i}",
             ),
         ]
@@ -89,7 +90,8 @@ def viz_part_models(warp_files, part_names):
     part_models = {}
     n_components = {}
     part_means = {}
-    for warp_file, part_name in zip(warp_files, part_names):
+    for part_name in part_names:
+        warp_file = warp_files[part_name]
         warp_model = pickle.load(open(warp_file, "rb"))
         part_models[part_name] = warp_model
         n_components[part_name] = len(warp_model.pca.components_)
@@ -103,22 +105,29 @@ def viz_part_models(warp_files, part_names):
     dashboard_features = []
     past_num = 0
     for part in part_names:
+        in_div = [html.P(f"{part}")]
         for i in range(n_components[part]):
-            dashboard_features += [
+            in_div += [
+                
                 html.P(f"Component {i}:"),
                 dcc.Slider(
                     part_means[part][i] - sample_range,
                     part_means[part][i] + sample_range,
                     sample_range / (num_ticks / 2),
                     value=part_means[part][i],
+                    marks=None,
                     id=f"Component_{past_num + i}",
-                ),
+                )
             ]
+        dashboard_features.append(html.Div(in_div, 
+            style={'width': f'{int(100/len(part_names)) - 1}%', 
+            'display': 'inline-block'}))
         past_num += n_components[part]
 
     dashboard_features += [
         dcc.Graph(id="Reconstruction"),
     ]
+    print(dashboard_features)
     app.layout = html.Div(dashboard_features)
 
     colorscale = "Viridis"
@@ -181,6 +190,7 @@ def viz_part_models(warp_files, part_names):
                     range=[-0.1, 0.1],
                 ),
             ),
+            uirevision= 'some-constant',
         )
 
         fig.update_layout(scene_aspectmode="cube")
@@ -191,6 +201,12 @@ def viz_part_models(warp_files, part_names):
 
 
 if __name__ == "__main__":
-    warp_file = "./example_data/example_pretrained"
-    viz_whole_model(warp_file)
-    # viz_part_models(part_files, part_names)
+    # warp_file = "./example_data/example_pretrained"
+    # viz_whole_model(warp_file)
+
+    part_names = ['body', 'spout', 'lid', 'handle']
+    part_files = {'body': "example_data/teapot_models/example_pretrained_body",
+			      'handle': "example_data/teapot_models/example_pretrained_handle", 
+			      'lid': "example_data/teapot_models/example_pretrained_lid",
+			      'spout':"example_data/teapot_models/example_pretrained_spout",}
+    viz_part_models(part_files, part_names)

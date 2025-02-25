@@ -1,18 +1,18 @@
-import utils, viz_utils
+from shape_warping import utils, viz_utils
 import pickle
 import trimesh
-from object_warping_utils import ObjectWarpingSE3Batch, warp_to_pcd_se3
+from shape_warping.shape_reconstruction import ObjectWarpingSE3Batch, warp_to_pcd_se3
 
 
 """ Example of reconstructing an object using a warp model """
 
 warp_model = pickle.load(open("example_pretrained", "rb"))
-test_object = trimesh.load("spatula_7.obj")
+test_object = trimesh.load("./example_data/spatula_meshes/spatula_7.obj")
 
 # Scaling to match the environment
 utils.trimesh_transform(test_object, scale=0.075)
 
-# You can try changing the orientation of the test object by uncommenting these lines
+# # You can try changing the orientation of the test object by uncommenting these lines
 # rotation = utils.random_quat()
 # utils.trimesh_transform(test_object, rotation=rotation)
 
@@ -61,13 +61,18 @@ viz_utils.show_pcds_plotly(
         "Target Pointcloud": test_pcl,
         "Reconstruction": pcl_reconstr,
     }
-)
+).show()
 
 # See the meshes
 viz_utils.show_meshes_plotly(
     {
-        "Source (Canonical) Mesh": warp_model.canonical_mesh,
-        "Target Mesh": test_object,
-        "Reconstruction": warp_reconstruction.to_transformed_mesh(reconstr_params),
+        #"Source (Canonical) Mesh": warp_model.mesh_vertices,
+        #"Target Mesh": test_object.vertices,
+        "Reconstruction": warp_model.to_transformed_mesh(reconstr_params).vertices,
+    },
+    {
+        #"Source (Canonical) Mesh": warp_model.mesh_vertices,
+        #"Target Mesh": test_object.vertices,
+        "Reconstruction": warp_model.to_transformed_mesh(reconstr_params).faces,
     }
-)
+).show()

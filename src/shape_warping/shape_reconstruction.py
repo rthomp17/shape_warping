@@ -1,4 +1,4 @@
-# edited from ondrej_biza/fewshot
+#Code by Ondrej Biza and Skye Thompson
 
 from ast import Call
 from typing import List, Optional, Tuple, Union, Callable
@@ -9,11 +9,9 @@ from scipy.spatial.transform import Rotation
 import torch
 from torch import nn, optim
 
-import utils, viz_utils
-import pdb
+from shape_warping import utils, viz_utils
 
 PARAM_1 = {"lr": 1e-2, "n_steps": 150, "n_samples": 1000, "object_size_reg": 0.01}
-
 
 def cost_batch_pt(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Calculate the one-sided Chamfer distance between two batches of point clouds in pytorch."""
@@ -32,7 +30,7 @@ class ObjectWarping:
 
     def __init__(
         self,
-        canon_obj: utils.CanonPart,
+        canon_obj: utils.CanonShape,
         pcd: NDArray[np.float32],
         device: "cpu",
         lr: float,

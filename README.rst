@@ -33,14 +33,30 @@
 shape_warping
 =============
 
-
 Code by Ondrej Biza and Skye Thompson
+Tested in python 3.9
+
+To install:
+
+``` 
+     git clone
+     cd shape_warping
+     pip install -e . 
+```
+
+Examples include:
+ - train_warp_model.py: Trains a shape warping model from a set of pose-aligned meshes representing objects from a category 
+ - train_warp_model_parts.py: Same as training a warp model, but in a loop over a set of presegmented parts 
+ - shape_reconstruction_example.py: Given a shape warping model of a category, reconstruct the mesh and point cloud of an object from that category in an arbitrary pose from a partial point cloud.
+ - shape_reconstruction_by_parts.py: Given a shape warping model of a set of part categories, reconstruct the mesh and point cloud of an object from that category in an arbitrary pose from presegmented partial point clouds of each part.
+ - shape_generation_visualizer.py: Given one or multiple shape models, enables interactively exploring the latent space by varying individual PCA components. launched via Dash at localhost:8050.
 
 
-A longer description of your project goes here...
-
-
-.. _pyscaffold-notes:
+TODOs: 
+     - Add in size and shape regularization
+     - Add function for calculating and using relational descriptors
+     - Add example script for doing skill transfer
+     - Incorporate code for non-PCA warping model
 
 Note
 ====

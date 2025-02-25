@@ -1,4 +1,4 @@
-# edited from ondrej_biza/fewshot
+#Code by Ondrej Biza and Skye Thompson
 
 import pickle
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 from sklearn.decomposition import PCA
 
-import viz_utils
+from shape_warping import viz_utils
 
 inference_kwargs = {
     "train_latents": True,

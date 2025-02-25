@@ -1,4 +1,4 @@
-import utils
+from shape_warping import utils, viz_utils
 import trimesh
 import numpy as np
 import copy as cp

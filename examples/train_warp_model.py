@@ -1,21 +1,22 @@
-import utils
+from shape_warping import utils
 import trimesh
 import time
 import numpy as np
 import copy as cp
 import pickle
-from warp_model_learning import learn_warps
+from shape_warping.warp_model_learning import learn_warps
 
 # Example of generating the warp model using the spatulas
 
 warp_training_object_ids = [
-    "./example_data/spatula_1.obj",
-    "./example_data/spatula_2.obj",
-    "./example_data/spatula_3.obj",
-    "./example_data/spatula_4.obj",
-    "./example_data/spatula_5.obj",
-    "./example_data/spatula_6.obj",
+    "./example_data/spatula_meshes/spatula_1.obj",
+    "./example_data/spatula_meshes/spatula_2.obj",
+    "./example_data/spatula_meshes/spatula_3.obj",
+    "./example_data/spatula_meshes/spatula_4.obj",
+    "./example_data/spatula_meshes/spatula_5.obj",
+    "./example_data/spatula_meshes/spatula_6.obj",
 ]
+
 warp_training_meshes = [trimesh.load(f) for f in warp_training_object_ids]
 
 n_dimensions = 4  # Number of dimensions of the latent space
