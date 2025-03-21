@@ -18,13 +18,33 @@ def cost_batch_pt(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Calculate the one-sided Chamfer distance between two batches of point clouds in pytorch."""
     # B x N x K
     diff = torch.sqrt(
-        torch.sum(torch.square(source[:, :, None] - target[:, None, :]), dim=3)
+        torch.sum(torch.square(source[:, :, None] - target[:, None, :]), dim=3
+        )
     )
     diff_flat = diff.view(diff.shape[0] * diff.shape[1], diff.shape[2])
     c_flat = diff_flat[list(range(len(diff_flat))), torch.argmin(diff_flat, dim=1)]
     c = c_flat.view(diff.shape[0], diff.shape[1])
     return torch.mean(c, dim=1)
 
+# Mask by the provided labels. Only cost between shared labels counts
+def mask_and_cost_batch_pt(target, source_labels, source, target_labels, two_sided=False):
+    summed_cost = None
+    weights = [1,1]
+
+    assert len(source_labels) == len(target_labels)
+    for source_label, target_label in zip(source_labels, target_labels):
+        for label, w in zip(np.unique(source_label), weights):
+          
+            part_cost = cost_batch_pt(source[:, torch.from_numpy(source_label)==label], target[:, torch.from_numpy(target_label)==label])
+            if two_sided:
+                part_cost += cost_batch_pt(target[:, torch.from_numpy(target_label)==label], source[:, torch.from_numpy(source_label)==label], )
+
+            if summed_cost is None:
+                summed_cost = part_cost * w
+            else:
+                summed_cost += part_cost * w
+
+    return summed_cost
 
 class ObjectWarping:
     """Base class for inference of object shape, pose and scale with gradient descent."""
@@ -38,6 +58,7 @@ class ObjectWarping:
         n_steps: int,
         cost_function: Callable = cost_batch_pt,
         n_samples: Optional[int] = None,
+        canon_labels: Optional[List[int]] = None,
         object_size_reg: Optional[float] = None,
         init_scale: float = 1.0,
     ):
@@ -50,8 +71,10 @@ class ObjectWarping:
         self.object_size_reg = object_size_reg
         self.init_scale = init_scale
         self.cost_function = cost_function
-        self.transform_history = []
-        self.cost_history = []
+        self.transform_history = None
+        self.cost_history = None
+        self.final_cost = None
+        self.canon_labels = canon_labels
 
         # This change is to eliminate some of the issues with outliers/doubled points skewing the mean
         # in the future, should probably be addressed some other, better way
@@ -109,13 +132,17 @@ class ObjectWarping:
     def subsample(
         self, num_samples: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Randomly subsample the canonical object, including its PCA projection."""
+        """Randomly subsample the canonical object, including its PCA projection and descriptors."""
         indices = np.random.randint(0, self.components.shape[1] // 3, num_samples)
         means_ = self.means.view(-1, 3)[indices].view(-1)
         components_ = self.components.view(self.components.shape[0], -1, 3)[:, indices]
         components_ = components_.reshape(self.components.shape[0], -1)
         canonical_obj_pt_ = self.canonical_pcl[indices]
+
         index_order = np.argsort(indices)
+        if self.canon_labels is not None:
+            self.subsampled_canon_labels = [cl[indices] for cl in self.canon_labels]
+
         return (
             means_,
             components_,
@@ -146,10 +173,13 @@ class ObjectWarping:
         )
 
         # Reset transformation and cost histories
-        self.transform_history = []
-        self.cost_history = []
+        transform_history = []
+        cost_history = []
+        latent_history = []
+        scale_history = []
 
         for _ in range(self.n_steps):
+
             if self.n_samples is not None:
                 (
                     means_,
@@ -169,18 +199,48 @@ class ObjectWarping:
             )
 
             # Saving optimization history for visualization
-            self.transform_history.append(
-                (
-                    self.center_param.detach().cpu().numpy(),
-                    torch.bmm(orthogonalize(self.pose_param), self.initial_poses)
-                    .detach()
-                    .cpu()
-                    .numpy(),
-                )
-            )
+            try:
+                transform_history.append(
+                        (self.center_param.detach().cpu().numpy() + self.global_means,
+                        torch.bmm(orthogonalize(self.pose_param), self.initial_poses)
+                        .detach()
+                        .cpu()
+                        .numpy(),
+                    ))
+            except IndexError:
+                transform_history.append(
+                        (self.center_param.detach().cpu().numpy() + self.global_means,
+                        yaw_to_rot_batch_pt(self.pose_param).detach()
+                        .cpu()
+                        .numpy()
+                        ,)
+                    )
+            try:
+                latent_history.append(self.latent_param.detach().cpu().numpy())
+            except AttributeError:
+                latent_history.append(None)
+            scale_history.append(self.scale_param.detach().cpu().numpy())
 
-            cost = self.cost_function(self.pcd[None], new_pcd)
-
+            if self.cost_function == cost_batch_pt:
+                cost = self.cost_function(self.pcd[None], new_pcd)
+            else:
+                # Different procedures for pure pose optimization versus warping
+                # TODO Move to classes or kwarg format to clean up
+                if not hasattr(self, 'latent_param'):
+                    latent_param, initial_latents = None, None
+                    if self.n_samples is None:
+                        cost = self.cost_function(self.pcd[None], new_pcd, self.canon_labels,)
+                    else:
+                        cost = self.cost_function(self.pcd[None], new_pcd, self.subsampled_canon_labels, )
+                else:
+                    latent_param, initial_latents = self.latent_param.data, self.initial_latents_pt
+                    if self.n_samples is None:
+                        cost = self.cost_function(self.pcd[None], new_pcd, self.canon_labels, latent_param, self.scale_param.data, initial_latents)
+                    else:
+                        cost = self.cost_function(self.pcd[None], new_pcd, self.subsampled_canon_labels, latent_param, self.scale_param.data, initial_latents)
+            
+            #Prevents local minima from warping objects to be giant (consequence of the one-sided chamfer metric)
+            #TODO move this out to a more generalized cost function structure
             if self.object_size_reg is not None:
                 size = torch.max(
                     torch.sqrt(torch.sum(torch.square(new_pcd), dim=-1)), dim=-1
@@ -189,22 +249,22 @@ class ObjectWarping:
             cost.sum().backward()
 
             # Saving cost history for visualization
-            self.cost_history.append(cost.detach().cpu().numpy())
+            cost_history.append(cost.detach().cpu().numpy())
             self.optim.step()
 
-        with torch.no_grad():
-            # Compute final cost without subsampling.
-            new_pcd = self.create_warped_transformed_pcd(
-                self.components, self.means, self.canonical_pcl
-            )
-
-            cost = cost_batch_pt(self.pcd[None], new_pcd)
-
-            if self.object_size_reg is not None:
-                size = torch.max(
-                    torch.sqrt(torch.sum(torch.square(new_pcd), dim=-1)), dim=-1
-                )[0]
-                cost = cost + self.object_size_reg * size
+        if self.cost_history is None:
+            self.cost_history = cost_history
+            self.transform_history = utils.transform_history_to_mat(transform_history)
+            self.latent_history = latent_history
+            self.scale_history = scale_history
+        else: 
+            self.cost_history = np.concatenate([self.cost_history, cost_history], axis=1,)
+            self.transform_history = np.concatenate([self.transform_history, utils.transform_history_to_mat(transform_history)], axis=1, dtype=object)
+            try:
+                self.latent_history = np.concatenate([self.latent_history, latent_history], axis=1,)
+            except np.exceptions.AxisError:
+                self.latent_history = latent_history
+            self.scale_history  = np.concatenate([self.scale_history, scale_history], axis=1,)
 
         return self.assemble_output(cost)
 
@@ -249,15 +309,13 @@ class ObjectWarpingSE3Batch(ObjectWarping):
             )
 
         if initial_latents is None:
-            initial_latents_pt = torch.zeros(
-                (n_angles, self.pca.n_components),
-                dtype=torch.float32,
-                device=self.device,
-            )
+            initial_latents_pt = torch.from_numpy(self.pca.components_ @ (-self.pca.mean_)).float().to(self.device).repeat(n_angles, 1)
+            self.initial_latents_pt = initial_latents_pt
         else:
             initial_latents_pt = torch.tensor(
                 initial_latents, dtype=torch.float32, device=self.device
             )
+            self.initial_latents_pt = initial_latents_pt
 
         if initial_scales is None:
             initial_scales_pt = (

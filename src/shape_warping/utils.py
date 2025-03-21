@@ -557,3 +557,94 @@ def center_pcl(pcl, return_centroid=False):
         return pcl, centroid
     else:
         return pcl
+
+# Constructs relational descriptors between parts
+def get_part_labels(part_pairs):
+    part_labels = {}
+    for part_pair in part_pairs:
+        ordered_part_names = list(part_pair.keys())
+        ordered_part_names.sort()
+
+        dists = np.sum(
+            np.square(part_pair[ordered_part_names[0]][None] - part_pair[ordered_part_names[1]][:, None]),
+            axis=-1,
+        )
+        
+        part_dists = {ordered_part_names[i]: np.min(dists, axis=i) for i in range(len(ordered_part_names))} 
+
+        # 0 where parts are near each other, 1 otherwise
+        for part in ordered_part_names:
+            if part not in part_labels.keys():
+                part_labels[part] = []
+            min_dist = np.min(part_dists[part])
+            part_labels[part].append(np.where(
+                    part_dists[part]-min_dist < np.mean(part_dists[part]-min_dist) * .6,
+                    np.zeros_like(part_dists[part]),
+                    np.ones_like(part_dists[part]),
+                )
+            )
+
+    return part_labels
+
+#Processed canon objects and then 
+def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True):
+    #Generates adjacency between all listed parts if none provided
+    if part_pairs is None:
+        part_pairs = [{part_1: part_canonicals[part_1], part_2: part_canonicals[part_2]} for part_1, part_2 in itertools.combinations(part_names, r=2) if part_1 != part_2]
+
+    # Doing adjustment to the centered/scaled parts to accurately approximate these labels
+    part_adjustment = {
+        part: pos_quat_to_transform(
+            part_canonicals[part].center_transform, (0, 0, 0, 1)
+        )
+        for part in part_names
+    }
+
+    # Realigning canonical parts - TODO make less bespoke
+    if rescale: 
+        ten_scaled_parts = scale_points_circle(
+            [part_canonicals[part].canonical_pcl for part in part_names], base_scale=10
+        )
+
+        adjusted_part_canon = {
+            part_names[i]: transform_pcd(ten_scaled_parts[i], part_adjustment[part_names[i]])
+            for i in range(len(part_names))
+        }
+
+        contact_parts = scale_points_circle(
+            [adjusted_part_canon[part] for part in part_names], base_scale=0.1
+        )
+    else: 
+        all_parts = [part_canonicals[part].canonical_pcl for part in part_names]
+        adjusted_part_canon = {
+            part_names[i]: transform_pcd(all_parts[i], part_adjustment[part_names[i]])
+            for i in range(len(part_names))
+        }
+        contact_parts =  [adjusted_part_canon[part] for part in part_names]
+
+     #TODO fix canon teapot scaling
+    if part_names[0] == 'body':
+        contact_parts[0] = scale_points_circle([contact_parts[0]], base_scale=.075)[0]
+
+    #Recreating the part pairs with the correct relative poses
+    contact_pairs = []
+    for pair in part_pairs:
+        contact_pairs.append({p: contact_parts[part_names.index(p)] for p in pair.keys()})
+
+    canon_labels = get_part_labels(
+        contact_pairs,
+    ) 
+    return canon_labels
+
+# Utility function for visualizing the optimization process
+def transform_history_to_mat(tf_history):
+    pose_history = []
+    for transform in tf_history:
+        pos, rot = transform
+        quat = rotm_to_quat(rot)
+        transform_mats = []
+        for p, q in zip(pos, quat):
+            transform_mat = pos_quat_to_transform(p, q)
+            transform_mats.append(transform_mat)
+        pose_history.append(transform_mats)
+    return pose_history

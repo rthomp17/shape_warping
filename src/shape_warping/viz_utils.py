@@ -1,5 +1,5 @@
 # Code by Ondrej Biza and Skye Thompson
-import copy
+import copy as cp
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 from plotly.subplots import make_subplots
 
 
-# Show point clouds from dictionary {name: pcd}
+# Show point clouds from dictionary, formatted as {name: pcd}
 def show_pcds_plotly(
     pcds: Dict[str, NDArray],
     center: bool = False,
@@ -17,6 +17,7 @@ def show_pcds_plotly(
     show_legend=True,
     markers=None,
     camera=None,
+    title= None,
 ):
     colorscales = [
         "Plotly3",
@@ -80,11 +81,14 @@ def show_pcds_plotly(
         camera.eye = dict(x=6.28, y=0, z=1)
     fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend)
 
+    if title is not None: 
+        fig.update_layout(title={
+        'text': title,})
+
     # fig.show()
     return fig
 
-
-# Show meshes from dictionary
+# Show meshes from two dictionaries, formatted as {name: vertices}, {name: faces}
 def show_meshes_plotly(
     vertices: Dict[str, NDArray],
     faces: Dict[str, NDArray],
@@ -368,7 +372,6 @@ def show_pcds_video_animation_plotly(
         )
 
     def make_frame(t):
-        # z = f(2*np.pi*t/2)
         i = int(t * len(moving_pcl_frames))
 
         for j in range(len(moving_pcl_frames)):
@@ -390,6 +393,7 @@ def show_pcds_video_animation_plotly(
 
 
 # Slider animation showing a series of point clouds as frames
+# Only one frame is made visible for each slider step
 def show_pcds_slider_animation_plotly(
     moving_pcl_name: str,
     moving_pcl_frames: NDArray,
@@ -471,10 +475,9 @@ def show_pcds_slider_animation_plotly(
     ]
 
     fig.update_layout(sliders=sliders)
-    # fig.show()
     return fig
 
-
+# Utility function to prevent circular imports
 def transform_pcd(pcd, trans, is_position: bool = True):
     n = pcd.shape[0]
     cloud = cp.deepcopy(pcd.T)
@@ -484,14 +487,11 @@ def transform_pcd(pcd, trans, is_position: bool = True):
     cloud = cloud[0:3, :].T
     return cloud
 
-
+# Function for visualizing the warp optimization history
 def generate_slider_viz(
     warp, static_pcls, tf_pcl, generate_animation=False, experiment_id=None
 ):
     best_idx = np.argmin(warp.cost_history[-1])
-    # print(f"best_idx: {best_idx}")
-    # print(f"best_cost: {np.min(combined_warp.cost_history[-1])}")
-    # print(f"best_tranform: {combined_warp.transform_history[0, best_idx]}")
     best_transform_history = []
     best_transforms = []
     step_names = []
@@ -518,3 +518,77 @@ def generate_slider_viz(
         step_names=step_names,
     )
     return slider_fig
+
+# Function for visualizing relational descriptors
+# TODO: Make more general rather than teapot-specific
+def visualize_teapot_relational_descriptors(part_pairs,
+                                            part_pcls,
+                                            pcl_labels,
+                                            title=None):
+    all_labeled_parts = {}
+    
+    part_nums = {}
+
+    # Unpacking labels and creating a named point cloud for every part-label combination
+    for part_pair in part_pairs:
+        ordered_part_pair = list(part_pair.keys())
+        ordered_part_pair.sort()
+
+        for part in ordered_part_pair:
+            if part in part_nums.keys():
+                i = part_nums[part]
+                all_labeled_parts = (
+                    all_labeled_parts
+                    | {
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[part][
+                            pcl_labels[part][i] == 0
+                        ]
+                    }
+                    | {
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[part][
+                            pcl_labels[part][i] == 1
+                        ]
+                    }
+                )
+                part_nums[part] += 1
+            else:
+                part_nums[part] = 1
+                all_labeled_parts = (
+                    all_labeled_parts
+                    | {
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[part][
+                            pcl_labels[part][0] == 0
+                        ]
+                    }
+                    | {
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[part][
+                            pcl_labels[part][0] == 1
+                        ]
+                    }
+                )
+
+    # Hard coded colors
+    colors = {
+        "body_lid_0_body": "gray",
+        "body_lid_1_body": "greens",
+        "body_lid_0_lid": "gray",
+        "body_lid_1_lid": "greens",
+        "body_spout_0_body": "gray",
+        "body_spout_1_body": "oranges",
+        "body_spout_0_spout": "gray",
+        "body_spout_1_spout": "oranges",
+        "body_handle_0_body": "gray",
+        "body_handle_1_body": "purples",
+        "body_handle_0_handle": "gray",
+        "body_handle_1_handle": "purples",
+        "handle_lid_0_handle": "gray",
+        "handle_lid_1_handle": "reds",
+        "handle_lid_0_lid": "gray",
+        "handle_lid_1_lid": "reds",
+        "lid_spout_0_lid": "gray",
+        "lid_spout_1_lid": "blues",
+        "lid_spout_0_spout": "gray",
+        "lid_spout_1_spout": "blues",
+    }
+    show_pcds_plotly(all_labeled_parts, colors=colors, title=title).show()
+
