@@ -408,6 +408,7 @@ class ObjectWarpingSE2Batch(ObjectWarping):
         train_poses: bool = True,
         train_scales: bool = True,
     ):
+
         # Initial poses are yaw angles here.
         n_angles = len(initial_poses)
         initial_poses_pt = torch.tensor(
@@ -426,11 +427,13 @@ class ObjectWarpingSE2Batch(ObjectWarping):
             )
 
         if initial_latents is None:
-            initial_latents_pt = torch.zeros(
-                (n_angles, self.pca.n_components),
-                dtype=torch.float32,
-                device=self.device,
-            )
+            initial_latents_pt = torch.from_numpy(self.pca.components_ @ (-self.pca.mean_)).float().to(self.device).repeat(n_angles, 1)
+            self.initial_latents_pt = initial_latents_pt
+            # initial_latents_pt = torch.zeros(
+            #     (n_angles, self.pca.n_components),
+            #     dtype=torch.float32,
+            #     device=self.device,
+            # )
         else:
             initial_latents_pt = torch.tensor(
                 initial_latents, dtype=torch.float32, device=self.device
@@ -486,7 +489,7 @@ class ObjectWarpingSE2Batch(ObjectWarping):
         all_parameters = []
 
         with torch.no_grad():
-            new_pcd, new_contact_points = self.create_warped_transformed_pcd(
+            new_pcd = self.create_warped_transformed_pcd(
                 self.components,
                 self.means,
                 self.canonical_pcl,

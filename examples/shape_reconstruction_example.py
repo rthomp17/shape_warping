@@ -38,7 +38,7 @@ inference_kwargs = {
 warp_reconstruction = ObjectWarpingSE3Batch(
     warp_model,
     test_pcl,
-    device="cpu",
+    device="cuda",
     lr=1e-2,
     n_steps=100,
 )

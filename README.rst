@@ -53,10 +53,10 @@ Examples include:
 
 
 TODOs: 
+     - Improve part example with cost function flags, mesh cleanup
      - Expand this documentation with figs
      - Better documentation for the slider app
      - Add in size and shape regularization
-     - Add function for calculating and using relational descriptors
      - Add example script for doing skill transfer
      - Incorporate code for non-PCA warping model
      - Add warp/cost comparison example

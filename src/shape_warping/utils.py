@@ -98,7 +98,11 @@ class CanonShape:
         with open(load_path, "rb") as f:
             data = pickle.load(f)
 
-        pcd = data["canonical_obj"]
+        if "canonical_obj" in data.keys():
+            pcd = data["canonical_obj"]
+        else:
+            pcd = data["canonical_obj_pcl"]
+            
         mesh_vertices = data["canonical_mesh_points"]
         mesh_faces = data["canonical_mesh_faces"]
         contact_points = None
@@ -157,6 +161,25 @@ def transform_to_pos_rot(trans: NPF64) -> Tuple[NPF64, NPF64]:
     # Just making sure.
     return pos.astype(np.float64), rot.astype(np.float64)
 
+def euler_to_quat(euler_rot):
+    from scipy.spatial.transform import Rotation
+
+    # Create a rotation object from Euler angles specifying axes of rotation
+    rot = Rotation.from_euler('xyz', euler_rot)
+
+    # Convert to quaternions and print
+    rot_quat = rot.as_quat()
+    return rot_quat
+
+def euler_to_matrix(euler_rot):
+    from scipy.spatial.transform import Rotation
+
+    # Create a rotation object from Euler angles specifying axes of rotation
+    rot = Rotation.from_euler('xyz', euler_rot)
+
+    # Convert to quaternions and print
+    rot_mat = rot.as_matrix()
+    return rot_mat
 
 def random_quat():
     return Rotation.random().as_quat()
