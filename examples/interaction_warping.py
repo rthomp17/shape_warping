@@ -7,8 +7,12 @@ from shape_warping.skill_transfer import *
 from shape_warping.shape_reconstruction import ObjectWarpingSE3Batch, warp_to_pcd_se3, ObjectWarpingSE2Batch, warp_to_pcd_se2
 
 '''
-# Load demonstration - object meshes, relative object transform
-# These are from RelNDF
+
+
+EXTRACTING INFO FROM DEMONSTRATION
+Load demonstration - consists of point clouds for (parent,child) objects + initial and final poses of child object 
+Child object is in the end effector. Parent object is on the table. 
+These are copied from RelNDF.
 '''
 
 demo_path = osp.join('example_data', 'mug_on_rack_demos', 'place_demo_0.npz')
@@ -42,6 +46,8 @@ for object_type in ('parent', 'child'):
     demo_final_pcds[object_type], _ = utils.farthest_point_sample(
                         demo_final_pcds[object_type], 2000
                     )
+
+# We actually care about the relative transform between objects
 demo_transforms = {
    'parent': np.matmul(
                 utils.pos_quat_to_transform(demo_final_poses['parent'][:3], demo_final_poses['parent'][3:]),
@@ -58,7 +64,7 @@ good_demo_camera_view = dict(
     eye=dict(x=-1, y=-1, z=.5)
 )
 
-# Visualize the skill demonstrationdemp
+# Visualize the skill demonstration
 demo_fig = viz_utils.show_pcds_plotly({
                              "Parent Object Initial Pose": demo_start_pcds['parent'],
                              "Child Object Initial Pose": demo_start_pcds['child'],
@@ -68,14 +74,15 @@ demo_fig = viz_utils.show_pcds_plotly({
 
 demo_fig.show()
 
-# Load warp models
+# Load shape warping models. These have been pretrained from ~5 examples.
 warp_models = {
     'parent': utils.CanonShape.from_pickle("example_data/rack_models/example_pretrained_whole_rack"),
     'child': utils.CanonShape.from_pickle("example_data/mug_models/example_pretrained_whole_mug"),
 }
 
 '''
-# Reconstruct the demo object geometry from pointclouds using shape warping
+
+Reconstruct the demo object geometries from the demo pointclouds using shape warping
 '''
 
 reconstructed_demo_pcds = {}
@@ -100,18 +107,20 @@ for object_type in ("parent", "child",):
     )
 
     print(f"Fitting the demo {object_type} object shape and pose")
+
     reconstructed_demo_pcds[object_type], _, reconstruction_params[object_type] = warp_to_pcd_se2(
         warp_reconstruction, n_angles=5, n_batches=1, inference_kwargs=inference_kwargs
     )
 
-# Transforming the reconstruction by the demo transform
-# Just to visualize and verify it's a sufficient reconstruction
+# Transforming the reconstruction to the 'placed' position
+# Just to visualize and verify that it matches the demonstrated placement
 reconstructed_demo_pcds_final = {
    'parent': utils.transform_pcd(reconstructed_demo_pcds['parent'], demo_transforms['parent']),
    'child': utils.transform_pcd(reconstructed_demo_pcds['child'], demo_transforms['child'])
    }
 
-# This updates the estimated child object pose correctly for obtaining the interaction points from the demo
+# This updates the estimated child object pose to the 'placed' position
+# Which is important for obtaining the interaction points from the demo
 reconstruction_params['child'] = update_reconstruction_params_with_transform(reconstruction_params['child'], demo_transforms['child'])
 
 # Visualize demo reconstruction
@@ -132,8 +141,11 @@ demo_reconstructed_fig = viz_utils.show_pcds_plotly({
 demo_reconstructed_fig.show()
 
 '''
-Identify demo interaction points - keypoints representing the relative
-transform between the demonstration objects. Details in Biza et al "Interaction Warping"
+
+
+
+Identify demo interaction points - keypoints representing the relative transform between the demonstration objects. 
+Details in Biza et al "Interaction Warping".
 '''
 
 # Find and save interaction points 
@@ -155,14 +167,13 @@ nearby_points_delta = 0.055 # Empirically picked
 
 interaction_points = {'knns': knns, 'deltas': deltas, "target_indices": target_indices}
 
-
 warped_interaction_points = warp_interaction_points(interaction_points, 
                                                     warp_models['child'], 
                                                     warp_models['parent'], 
                                                     reconstruction_params['child'], 
                                                     reconstruction_params['parent'])
 
-# Visualize demo with keypoints and anchors
+# Visualize demo with the interaction points
 demo_with_keypoints_fig = viz_utils.show_pcds_plotly({
                              "Parent Object Final": demo_final_pcds['parent'],
                              "Child Object Final": demo_final_pcds['child'],
@@ -174,6 +185,9 @@ demo_with_keypoints_fig = viz_utils.show_pcds_plotly({
 demo_with_keypoints_fig.show()
 
 '''
+
+
+
 AT TEST TIME
 
 # Load test objects (a few example objects copied from Shapenet)
@@ -185,10 +199,6 @@ test_parent_mesh = get_rack_mesh(all_test_racks[test_idx])
 test_child_mesh = get_mug_mesh(all_test_mugs[test_idx])
 
 utils.trimesh_transform(test_child_mesh, rotation=utils.euler_to_matrix([np.pi/2, 0, 0]))
-
-# Scaling to match the environment if necessary
-# utils.trimesh_transform(test_parent_mesh, scale=0.1)
-# utils.trimesh_transform(test_child_mesh, scale=0.1)
 
 # # You can try changing the orientation of the test object by uncommenting these lines
 # rotation = utils.random_quat()
@@ -237,24 +247,29 @@ for object_type in ("parent", "child"):
         warp_reconstruction, n_angles=5, n_batches=1, inference_kwargs=inference_kwargs
     )
 
+
 # Visualize target reconstruction
-test_reconstructed_fig = viz_utils.show_pcds_plotly({"Test Parent Object": test_pcds['parent'],
+test_reconstructed_fig = viz_utils.show_pcds_plotly({
+                             "Test Parent Object": test_pcds['parent'],
                              "Test Child Object": test_pcds['child'],
                              "Test Parent Object Reconstruction": reconstructed_test_pcds['parent'],
                              "Test Child Object Reconstruction": reconstructed_test_pcds['child'],
                              })
 test_reconstructed_fig.show()
 
+'''
 
-# Transfer keypoints
+Skill transfer using the reconstruction from shape warping
+'''
+
+# Transfer interaction points
 test_interaction_points = warp_interaction_points(interaction_points, 
                                                     warp_models['child'], 
                                                     warp_models['parent'], 
                                                     reconstructed_test_params['child'], 
                                                     reconstructed_test_params['parent'])
 
-
-# Visualize transferred keypoints 
+# Visualize transferred interaction points
 test_transferred_points_fig = viz_utils.show_pcds_plotly({"Test Parent Object": test_pcds['parent'],
                              "Test Child Object": test_pcds['child'],
                              "Test Parent Object Reconstruction": reconstructed_test_pcds['parent'],
@@ -266,7 +281,7 @@ test_transferred_points_fig = viz_utils.show_pcds_plotly({"Test Parent Object": 
 test_transferred_points_fig.show()
 
 
-# Transfer the skill (based on keypoint alignment)
+# Transfer the skill (based on interaction point alignment)
 test_transform = infer_relpose(
         interaction_points,
         warp_models['child'], 
@@ -274,9 +289,9 @@ test_transform = infer_relpose(
         reconstructed_test_params['child'], 
         reconstructed_test_params['parent'],
     )
+
+
 # Visualize the transferred skill
-
-
 final_transfer = viz_utils.show_pcds_plotly({
     "Test Parent Object": test_pcds['parent'],
     "Test Child Object": test_pcds['child'],

@@ -213,7 +213,6 @@ def get_rack_mesh(pcl_id):
     mesh = utils.trimesh_load_object("example_data/rack_meshes/" + f"{pcl_id}")
     return mesh
 
-
 def load_all_shapenet_files(obj_type):
     mesh_data_dirs = {
         "mug": "mug_meshes",
