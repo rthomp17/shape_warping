@@ -39,11 +39,16 @@ def get_knn_and_deltas(obj, vps, k=10, show=False):
 
 def get_interaction_points(source, target, canon_source_obj,
                            source_obj_param, canon_target_obj,
-                           target_obj_param, delta=0.055,):
+                           target_obj_param, delta=0.055,
+                           mesh_vertices_only=False):
 
     source_pcd = canon_source_obj.to_transformed_pcd(source_obj_param)
     target_pcd = canon_target_obj.to_transformed_pcd(target_obj_param)
-            
+
+    if mesh_vertices_only:
+        source_pcd=source_pcd[:len(canon_source_obj.mesh_vertices)]
+        target_pcd=target_pcd[:len(canon_target_obj.mesh_vertices)]
+
     # viz_utils.show_pcds_plotly({
     #     "pcd": source_pcd,
     #     "warp": target_pcd
@@ -73,6 +78,10 @@ def get_interaction_points(source, target, canon_source_obj,
     full_source_pcd = canon_source_obj.to_pcd(source_obj_param)
     full_target_pcd = canon_target_obj.to_pcd(target_obj_param)
 
+    if mesh_vertices_only:
+        full_source_pcd=full_source_pcd[:len(canon_source_obj.mesh_vertices)]
+        full_target_pcd=full_target_pcd[:len(canon_target_obj.mesh_vertices)]
+
     knns, deltas = get_knn_and_deltas(full_source_pcd, pos_target_source_coords)
 
     dist_2 = np.sqrt(np.sum(np.square(full_target_pcd[:, None] - pos_target_target_coords[None]), axis=2))
@@ -81,19 +90,49 @@ def get_interaction_points(source, target, canon_source_obj,
     return knns, deltas, i_2
 
 
+def mesh_edit_interaction_points(interaction_points, edited_child_mesh, edited_parent_mesh, child_pose, parent_pose):
+
+    
+    knns = interaction_points['knns']
+    deltas = interaction_points['deltas']
+    target_indices = interaction_points['target_indices']
+
+    # Warping the interaction points to the object shape
+    anchors = edited_parent_mesh.vertices[
+        knns
+    ]
+    targets_parent = np.mean(
+        anchors + deltas, axis=1
+    )
+    targets_child = edited_child_mesh.vertices[
+        target_indices
+    ] 
+
+    child_transform  = child_pose
+    parent_transform  = parent_pose
+
+    child_targets = utils.transform_pcd(targets_child,
+                                        child_transform)
+
+    parent_targets = utils.transform_pcd(targets_parent,
+                                         parent_transform)
+
+    return {'parent':parent_targets, 'child': child_targets}
+
+
 def warp_interaction_points(interaction_points, child_model, parent_model, child_reconstruction_params, parent_reconstruction_params):
     knns = interaction_points['knns']
     deltas = interaction_points['deltas']
     target_indices = interaction_points['target_indices']
 
     # Warping the interaction points to the object shape
-    anchors = child_model.to_pcd(child_reconstruction_params)[
+    anchors = parent_model.to_pcd(parent_reconstruction_params)[
         knns
     ]
-    targets_child = np.mean(
+    targets_parent = np.mean(
         anchors + deltas, axis=1
     )
-    targets_parent = parent_model.to_pcd(parent_reconstruction_params)[
+    targets_child = child_model.to_pcd(child_reconstruction_params)[
         target_indices
     ] 
 
