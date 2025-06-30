@@ -183,7 +183,7 @@ demo_with_keypoints_fig = viz_utils.show_pcds_plotly({
                              "Parent Interaction Points": warped_interaction_points['parent'],
                              "Child Interaction Points": warped_interaction_points['child'],
                              })
-#demo_with_keypoints_fig.show()
+demo_with_keypoints_fig.show()
 
 
 """
@@ -195,8 +195,8 @@ rack_mesh = warp_models['parent'].to_mesh(reconstruction_params['parent'])
 mug_mesh = warp_models['child'].to_mesh(reconstruction_params['child'])
 
 #Just being careful because the trimesh transform functions do in-place mutation
-transformed_mug_mesh = cp.deepcopy(rack_mesh)
-transformed_rack_mesh = cp.deepcopy(mug_mesh)
+transformed_mug_mesh = cp.deepcopy(mug_mesh)
+transformed_rack_mesh = cp.deepcopy(rack_mesh)
 
 mug_scaling_matrix = np.eye(4)
 mug_scaling_matrix[2, 2] *= .85
@@ -219,7 +219,7 @@ mesh_edit_fig = viz_utils.show_pcds_plotly({
                              },
                              camera=good_demo_camera_view)
 
-mesh_edit_fig.show()
+#mesh_edit_fig.show()
 edit_transformed_interaction_points = mesh_edit_interaction_points(interaction_points, 
                                                                    transformed_mug_mesh,
                                                                    transformed_rack_mesh,
@@ -231,12 +231,25 @@ mesh_edit_with_keypoints_fig = viz_utils.show_pcds_plotly({
                              "Parent Object Original": demo_start_pcds['parent'],
                              "Child Object Original": demo_start_pcds['child'],
 
-                             "Parent Object Edited": transformed_mug_mesh.vertices,
-                             "Child Object Edited": transformed_rack_mesh.vertices,
+                             "Parent Object Edited": transformed_rack_mesh.vertices,
+                             "Child Object Edited": transformed_mug_mesh.vertices,
 
                              "Parent Interaction Points": edit_transformed_interaction_points['parent'],
                              "Child Interaction Points": edit_transformed_interaction_points['child'],
                              })
-mesh_edit_with_keypoints_fig.show()
+#mesh_edit_with_keypoints_fig.show()
 
+test_transform = mesh_edit_infer_relpose(interaction_points, 
+                        transformed_mug_mesh,
+                        transformed_rack_mesh,
+                        np.eye(4), 
+                        np.eye(4))
+
+# Visualize the transferred skill
+final_transfer = viz_utils.show_pcds_plotly({
+    "Test Parent Object": transformed_rack_mesh.vertices,
+    "Test Child Object": transformed_mug_mesh.vertices,
+    "Test Child Place": utils.transform_pcd(transformed_mug_mesh.vertices, test_transform)
+    })
+final_transfer.show()
 

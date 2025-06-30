@@ -98,13 +98,13 @@ def mesh_edit_interaction_points(interaction_points, edited_child_mesh, edited_p
     target_indices = interaction_points['target_indices']
 
     # Warping the interaction points to the object shape
-    anchors = edited_parent_mesh.vertices[
+    anchors = edited_child_mesh.vertices[
         knns
     ]
-    targets_parent = np.mean(
+    targets_child = np.mean(
         anchors + deltas, axis=1
     )
-    targets_child = edited_child_mesh.vertices[
+    targets_parent = edited_parent_mesh.vertices[
         target_indices
     ] 
 
@@ -149,6 +149,37 @@ def warp_interaction_points(interaction_points, child_model, parent_model, child
 
     return {'parent':parent_targets, 'child': child_targets}
 
+
+#TODO: I think there may be a mismatch in the child and parent here from the original interaction warping code
+def mesh_edit_infer_relpose(interaction_points,
+                            edited_child_mesh, 
+                            edited_parent_mesh,
+                            child_mesh_pose,
+                            parent_mesh_pose):
+    
+    knns = interaction_points['knns']
+    deltas = interaction_points['deltas']
+    target_indices = interaction_points['target_indices']
+
+    # Warping the interaction points to the object shape
+    anchors = edited_child_mesh.vertices[
+        knns
+    ]
+    targets_child = np.mean(
+        anchors + deltas, axis=1
+    )
+    targets_parent = edited_parent_mesh.vertices[
+        target_indices
+    ] 
+        # Canonical source obj to canonical target obj.
+    trans_cs_to_ct, _, _ = utils.best_fit_transform(targets_child, targets_parent)
+
+    trans_s_to_b = child_mesh_pose
+    trans_t_to_b = parent_mesh_pose
+
+    # Compute relative transform.
+    trans_s_to_t = trans_t_to_b @ trans_cs_to_ct @ np.linalg.inv(trans_s_to_b)
+    return trans_s_to_t
 
 def infer_relpose(
         interaction_points,
