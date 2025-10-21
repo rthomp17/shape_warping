@@ -37,7 +37,9 @@ Code by Ondrej Biza and Skye Thompson
 
 Tested in python 3.9
 
-This repository contains code for transferring features across objects of different geometry using shape warping, a technique introduced in **Rodriguez and Benkhe** [^1] and extended in **Biza et al** [^2] and **Thompson et al** [^3]. It also includes tools for transferring object manipulation skills using those features via Interaction Warping [^2][^3].
+This repository contains code for transferring features across objects of different geometry using shape warping, a technique introduced in **Rodriguez and Behnke** [^1] and extended in **Biza et al** [^2] and **Thompson et al** [^3]. It also includes tools for transferring object manipulation skills using those features via Interaction Warping [^2][^3].
+
+![image(https://postimg.cc/JGQFmfyS)
 
 Here you'll find the code for:
 
@@ -45,6 +47,8 @@ Here you'll find the code for:
 - Using those models to estimate the pose and shape of an object or part from a point cloud observation. 
 - Transferring a manpulation skill from a demonstration to objects of the same category using shape-warping. 
 - Recreating the simulation experiments in [^2][^3] [Coming soon!]
+
+![image](https://postimg.cc/PPM7hgLK)
 
 To install:
 
