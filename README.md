@@ -1,36 +1,5 @@
-.. These are examples of badges you might want to add to your README:
-   please update the URLs accordingly
-
-    .. image:: https://api.cirrus-ci.com/github/<USER>/shape_warping.svg?branch=main
-        :alt: Built Status
-        :target: https://cirrus-ci.com/github/<USER>/shape_warping
-    .. image:: https://readthedocs.org/projects/shape_warping/badge/?version=latest
-        :alt: ReadTheDocs
-        :target: https://shape_warping.readthedocs.io/en/stable/
-    .. image:: https://img.shields.io/coveralls/github/<USER>/shape_warping/main.svg
-        :alt: Coveralls
-        :target: https://coveralls.io/r/<USER>/shape_warping
-    .. image:: https://img.shields.io/pypi/v/shape_warping.svg
-        :alt: PyPI-Server
-        :target: https://pypi.org/project/shape_warping/
-    .. image:: https://img.shields.io/conda/vn/conda-forge/shape_warping.svg
-        :alt: Conda-Forge
-        :target: https://anaconda.org/conda-forge/shape_warping
-    .. image:: https://pepy.tech/badge/shape_warping/month
-        :alt: Monthly Downloads
-        :target: https://pepy.tech/project/shape_warping
-    .. image:: https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Twitter
-        :alt: Twitter
-        :target: https://twitter.com/shape_warping
-
-.. image:: https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold
-    :alt: Project generated with PyScaffold
-    :target: https://pyscaffold.org/
-
-|
 
 
-=============
 shape_warping
 =============
 
@@ -40,7 +9,7 @@ Tested in python 3.9
 
 This repository contains code for transferring features across objects of different geometry using shape warping, a technique introduced in **Rodriguez and Behnke** [^1] and extended in **Biza et al** [^2] and **Thompson et al** [^3]. It also includes tools for transferring object manipulation skills using those features via Interaction Warping [^2][^3].
 
-![image](readme_script_summary.png)
+![Image](readme_summary.png)
 
 Here you'll find the code for:
 
