@@ -40,7 +40,7 @@ Tested in python 3.9
 
 This repository contains code for transferring features across objects of different geometry using shape warping, a technique introduced in **Rodriguez and Behnke** [^1] and extended in **Biza et al** [^2] and **Thompson et al** [^3]. It also includes tools for transferring object manipulation skills using those features via Interaction Warping [^2][^3].
 
-![image](https://i.postimg.cc/JGQFmfyS/Screenshot-2025-10-21-at-6-18-43-PM.png)
+![image](readme_script_summary.png)
 
 Here you'll find the code for:
 
@@ -49,7 +49,7 @@ Here you'll find the code for:
 - Transferring a manpulation skill from a demonstration to objects of the same category using shape-warping. 
 - Recreating the simulation experiments in [^2][^3] [Coming soon!]
 
-![image](https://i.postimg.cc/PPM7hgLK/Screenshot-2025-10-21-at-6-18-10-PM.png)
+![image](readme_script_output.png)
 
 To install:
 
