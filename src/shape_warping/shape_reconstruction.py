@@ -27,18 +27,18 @@ def cost_batch_pt(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return torch.mean(c, dim=1)
 
 # Mask by the provided labels. Only cost between shared labels counts
-def mask_and_cost_batch_pt(target, source_labels, source, target_labels, two_sided=False):
+def mask_and_cost_batch_pt(target, source_labels, source, target_labels, switch_sides=False):
     summed_cost = None
     weights = [1,1]
 
     assert len(source_labels) == len(target_labels)
     for source_label, target_label in zip(source_labels, target_labels):
         for label, w in zip(np.unique(source_label), weights):
-          
-            part_cost = cost_batch_pt(source[:, torch.from_numpy(source_label)==label], target[:, torch.from_numpy(target_label)==label])
-            if two_sided:
-                part_cost += cost_batch_pt(target[:, torch.from_numpy(target_label)==label], source[:, torch.from_numpy(source_label)==label], )
-
+            
+            if switch_sides:
+                part_cost = cost_batch_pt(target[:, torch.from_numpy(target_label)==label], source[:, torch.from_numpy(source_label)==label], )
+            else:
+                part_cost = cost_batch_pt(source[:, torch.from_numpy(source_label)==label], target[:, torch.from_numpy(target_label)==label])
             if summed_cost is None:
                 summed_cost = part_cost * w
             else:
@@ -633,7 +633,6 @@ class ObjectSE3Batch(ObjectWarping):
                 all_parameters.append(obj_param)
 
         return all_costs, all_new_pcds, all_parameters
-
 
 class ObjectSE2Batch(ObjectWarping):
     """Object pose gradient descent in SE2."""

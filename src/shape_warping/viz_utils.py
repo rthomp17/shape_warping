@@ -33,7 +33,7 @@ def show_pcds_plotly(
     if center:
         tmp = np.concatenate(list(pcds.values()), axis=0)
         m = np.mean(tmp, axis=0)
-        pcds = copy.deepcopy(pcds)
+        pcds = cp.deepcopy(pcds)
         for k in pcds.keys():
             pcds[k] = pcds[k] - m[None]
 
@@ -44,6 +44,11 @@ def show_pcds_plotly(
     data = []
     for idx, key in enumerate(pcds.keys()):
         v = pcds[key]
+        print(v)
+        print(v.shape)
+        print(v[:, 0])
+        print(v[:, 1])
+        print(v[:, 2])
         if colors is not None:
             colorscale = colors[key]
         else:
@@ -75,11 +80,11 @@ def show_pcds_plotly(
         "aspectratio": {"x": 1, "y": 1, "z": 1},
     }
     fig = go.Figure(data=data)
-    if camera is None:
-        camera = fig.layout.scene.camera
-        camera.up = dict(x=0, y=1, z=0)
-        camera.eye = dict(x=6.28, y=0, z=1)
-    fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend)
+    # if camera is None:
+    #     camera = fig.layout.scene.camera
+    #     camera.up = dict(x=0, y=1, z=0)
+    #     camera.eye = dict(x=6.28, y=0, z=1)
+    # fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend)
 
     if title is not None: 
         fig.update_layout(title={
@@ -401,26 +406,25 @@ def show_pcds_slider_animation_plotly(
     step_names: List[str],
 ):
     fig = go.Figure()
-    fig.layout.scene.update(
-        dict(
-            aspectmode="cube",
-            xaxis=dict(range=[-0.1, 0.1], visible=False),
-            yaxis=dict(range=[-0.1, 0.1], visible=False),
-            zaxis=dict(range=[-0.1, 0.1], visible=False),
-            aspectratio=dict(x=1, y=1, z=0.95),
-        )
-    )
+    # fig.layout.scene.update(
+    #     dict(
+    #         aspectmode="cube",
+    #         xaxis=dict(range=[-0.1, 0.1], visible=False),
+    #         yaxis=dict(range=[-0.1, 0.1], visible=False),
+    #         zaxis=dict(range=[-0.1, 0.1], visible=False),
+    #         aspectratio=dict(x=1, y=1, z=0.95),
+    #     )
+    # )
 
-    camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
+    #camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
 
-    fig.update_layout(scene_camera=camera)
+    #fig.update_layout(scene_camera=camera)
 
-    # Add traces, one for each slider step
+    #Add traces, one for each slider step
     for t, moving_pcl_frame in enumerate(moving_pcl_frames):
         for part in moving_pcl_frame.keys():
             fig.add_trace(
                 go.Scatter3d(
-                    visible=False,
                     x=moving_pcl_frame[part][:, 0],
                     y=moving_pcl_frame[part][:, 1],
                     z=moving_pcl_frame[part][:, 2],
@@ -499,7 +503,7 @@ def generate_slider_viz(
     tf2_history = []
     for transform, cost in zip(warp.transform_history, warp.cost_history):
         best_trans = transform[best_idx]
-        best_transforms.append(transform_pcd(tf_pcl, best_trans.astype(float)))
+        best_transforms.append({part: transform_pcd(tf_pcl[part], best_trans.astype(float))for part in tf_pcl.keys()})
         step_names.append(f"COST: {cost[best_idx]}")
 
     if generate_animation:

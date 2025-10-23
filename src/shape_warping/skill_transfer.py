@@ -1,18 +1,196 @@
 import os
 import os.path as osp
 import numpy as np
-from shape_warping import utils
+from shape_warping import utils, viz_utils
+import pickle
+import itertools
+
+class TestScene():
+    max_points_per_object = 2000
+
+    def __init__(self,pcds, segmented_pcds):
+        self.pcds = pcds
+        self.segmented_pcds = segmented_pcds
+
+        for object_type in ('parent', 'child'):
+            self.pcds[object_type], _ = utils.farthest_point_sample(
+                                self.pcds[object_type], min(DemoScene.max_points_per_object, len(self.pcds[object_type]))
+                            )
+        for object_type in ('parent', 'child'):
+            for part in self.segmented_pcds[object_type].keys():
+                self.segmented_pcds[object_type][part], _ = utils.farthest_point_sample(
+                                self.segmented_pcds[object_type][part], min(DemoScene.max_points_per_object, len(self.segmented_pcds[object_type][part]))
+                            )
+            
+
+        self.get_part_relationships()
+
+    def get_part_relationships(self, num_close_threshold=20, distance_threshold=0.05):
+        #Generate all possible pairs of parts
+        all_child_part_pairs = itertools.combinations(self.segmented_pcds['child'].keys(), r=2)
+        all_parent_part_pairs = itertools.combinations(self.segmented_pcds['parent'].keys(), r=2)
+
+        self.child_part_relationships = []
+        for pair in all_child_part_pairs:
+            #Get the distance between closest points on the two objects
+            dist = utils.nearest_neighbor_distances(self.segmented_pcds['child'][pair[0]], self.segmented_pcds['child'][pair[1]])
+            close_points = dist < distance_threshold
+            if np.sum(close_points) > num_close_threshold:
+                self.child_part_relationships.append(pair)
+
+        self.parent_part_relationships = []
+        for pair in all_parent_part_pairs:
+            #Get the distance between closest points on the two objects
+            dist = utils.nearest_neighbor_distances(self.segmented_pcds['parent'][pair[0]], self.segmented_pcds['parent'][pair[1]])
+            close_points = dist < distance_threshold
+            if np.sum(close_points) > num_close_threshold:
+                self.parent_part_relationships.append(pair)
+
+    @staticmethod
+    def from_pickle(path):
+        with open(path, 'rb') as f:
+            test_scene = pickle.load(f)
+        
+        pcds = {
+            'parent': test_scene["parent_pcd"].item()['parent'],
+            'child': test_scene["child_pcd"].item()['child']
+        }
+        segmented_pcds = {
+            'parent': {part: test_scene["segmented_pcd"].item()['parent'][part] for part in test_scene["segmented_pcd"].item()['parent']}, 
+            'child': {part: test_scene["segmented_pcd"].item()['child'][part] for part in test_scene["segmented_pcd"].item()['child']}
+        }
+        return TestScene(pcds, segmented_pcds)
+
+class DemoScene():
+    max_points_per_object = 2000
+
+    def __init__(self,
+                 initial_pcds,
+                 segmented_initial_pcds,
+                 final_pcds,
+                 segmented_final_pcds,
+                 start_poses,
+                 final_poses, 
+                 interaction_points = None):
+        
+        self.initial_pcds = initial_pcds
+        self.segmented_initial_pcds = segmented_initial_pcds
+        self.final_pcds = final_pcds
+        self.segmented_final_pcds = segmented_final_pcds
+        self.start_poses = start_poses
+        self.final_poses = final_poses
+        self.child_part_names = sorted(list(self.segmented_final_pcds['child'].keys()))
+        self.parent_part_names = sorted(list(self.segmented_final_pcds['parent'].keys()))
+    
+        self.parent_transform = np.matmul(
+                        utils.pos_quat_to_transform(self.final_poses['parent'][:3], self.final_poses['parent'][3:]),
+                        np.linalg.inv(utils.pos_quat_to_transform(self.start_poses['parent'][:3], self.start_poses['parent'][3:])))
+        self.child_transform = np.matmul(
+                        utils.pos_quat_to_transform(self.final_poses['child'][:3], self.final_poses['child'][3:]),
+                        np.linalg.inv(utils.pos_quat_to_transform(self.start_poses['child'][:3], self.start_poses['child'][3:])))
+        
+        self.interaction_points = interaction_points
+        self.get_part_relationships()
+        self.part_relationships = {'parent': self.parent_part_relationships, 'child': self.child_part_relationships}
 
 
+    def show_demo(self):
+         # Just to make visualization easier
+        good_demo_camera_view = dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=.5, y=.5, z=.5),
+            eye=dict(x=-1, y=-1, z=.5)
+        )
 
-def update_reconstruction_params_with_transform(demo_child_params, demo_transform):
+        # Visualize the skill demonstration
+        demo_fig = viz_utils.show_pcds_plotly({
+                                    "Parent Object Initial Pose": self.initial_pcds['parent'],
+                                    "Child Object Initial Pose": self.initial_pcds['child'],
+                                    "Parent Object End Pose": self.final_pcds['parent'],
+                                    "Child Object End Pose": self.final_pcds['child']}, 
+                                    camera=good_demo_camera_view)
 
-    child_transform = utils.pos_quat_to_transform(demo_child_params.position, demo_child_params.quat)
-    new_child_transform = np.matmul(demo_transform, child_transform)
-    demo_child_params.position, demo_child_params.quat = utils.transform_to_pos_quat(new_child_transform)
+        demo_fig.show()
 
-    return demo_child_params
+    def get_part_relationships(self, num_close_threshold=20, distance_threshold=0.05):
+        #Generate all possible pairs of parts
+        all_child_part_pairs = itertools.combinations(self.segmented_initial_pcds['child'].keys(), r=2)
+        all_parent_part_pairs = itertools.combinations(self.segmented_initial_pcds['parent'].keys(), r=2)
 
+        self.child_part_relationships = []
+        for pair in all_child_part_pairs:
+            #Get the distance between closest points on the two objects
+            dist = utils.nearest_neighbor_distances(self.segmented_initial_pcds['child'][pair[0]], self.segmented_initial_pcds['child'][pair[1]])
+            close_points = dist < distance_threshold
+            if np.sum(close_points) > num_close_threshold:
+                self.child_part_relationships.append(pair)
+
+        self.parent_part_relationships = []
+        for pair in all_parent_part_pairs:
+            #Get the distance between closest points on the two objects
+            dist = utils.nearest_neighbor_distances(self.segmented_initial_pcds['parent'][pair[0]], self.segmented_initial_pcds['parent'][pair[1]])
+            close_points = dist < distance_threshold
+            if np.sum(close_points) > num_close_threshold:
+                self.parent_part_relationships.append(pair)
+
+
+    @staticmethod
+    def from_pickle(path):
+        with open(path, 'rb') as f:
+            demo = pickle.load(f)
+
+        initial_pcds = {
+        'parent': demo["start_pcds"]['parent'],
+        'child': demo["start_pcds"]['child']
+        }
+
+        segmented_initial_pcds = {
+            'parent': {part: demo["segmented_start_pcds"]['parent'][part] for part in demo["segmented_start_pcds"]['parent']}, 
+            'child': {part: demo["segmented_start_pcds"]['child'][part] for part in demo["segmented_start_pcds"]['child']}
+        }
+
+        segmented_final_pcds = {
+            'parent': {part: demo["segmented_final_pcds"]['parent'][part] for part in demo["segmented_final_pcds"]['parent']}, 
+            'child': {part: demo["segmented_final_pcds"]['child'][part] for part in demo["segmented_final_pcds"]['child']}
+        }
+
+        start_poses = {
+        'parent': demo["start_object_poses"]['parent'],
+        'child': demo["start_object_poses"]['child']
+        }
+
+        final_pcds = {
+        'parent': demo["final_pcds"]['parent'],
+        'child': demo["final_pcds"]['child']
+        }
+
+        final_poses = {
+        'parent': demo["final_object_poses"]['parent'],
+        'child': demo["final_object_poses"]['child']
+        }
+
+         # Subsamples points for faster inference/to prevent CUDA from running out of memory
+        for object_type in ('parent', 'child'):
+            initial_pcds[object_type], _ = utils.farthest_point_sample(
+                                initial_pcds[object_type], DemoScene.max_points_per_object
+                            )
+            final_pcds[object_type], _ = utils.farthest_point_sample(
+                                final_pcds[object_type], DemoScene.max_points_per_object
+                            )
+            
+        for object_type in ('parent', 'child'):
+            for part in segmented_initial_pcds[object_type].keys():
+                segmented_initial_pcds[object_type][part], _ = utils.farthest_point_sample(
+                                segmented_initial_pcds[object_type][part], min(DemoScene.max_points_per_object, len(segmented_initial_pcds[object_type][part]))
+                            )
+                segmented_final_pcds[object_type][part], _ = utils.farthest_point_sample(
+                                segmented_final_pcds[object_type][part], min(DemoScene.max_points_per_object, len(segmented_final_pcds[object_type][part]))
+                            )   
+        if 'interaction_points' in demo.keys():
+            interaction_points = demo["interaction_points"]
+        else:
+            interaction_points = None
+        return DemoScene(initial_pcds, segmented_initial_pcds, final_pcds, segmented_final_pcds, start_poses, final_poses, interaction_points)
 
 def get_knn_and_deltas(obj, vps, k=10, show=False):
     """Anchor virtual points on an object using k-nearest-neighbors."""
@@ -37,7 +215,7 @@ def get_knn_and_deltas(obj, vps, k=10, show=False):
     deltas_list = np.stack(deltas_list)
     return knn_list, deltas_list
 
-def get_interaction_points(source, target, canon_source_obj,
+def get_interaction_points(canon_source_obj,
                            source_obj_param, canon_target_obj,
                            target_obj_param, delta=0.055,
                            mesh_vertices_only=False):
@@ -89,10 +267,34 @@ def get_interaction_points(source, target, canon_source_obj,
 
     return knns, deltas, i_2
 
+def construct_part_alignment_objective(alignment_constraint_pcd, source_pcd_parts):
+    constraint_component_pcds = alignment_constraint_pcd.component_pcds
+    if len(constraint_component_pcds) == 1:
+            combined_canon_part_labels = np.zeros(component_pcls[0].shape[0])
+    else:
+        combined_canon_part_labels = np.array(
+            list(
+                itertools.chain(
+                    *[
+                        [i for _ in range(constraint_component_pcds[i].shape[0])]
+                        for i in range(len(constraint_component_pcds))
+                    ]
+                )
+            )
+        )
+
+    cost_function = (
+                    lambda source, target, canon_part_labels: 
+                    mask_and_cost_batch_pt(
+                        source,
+                        canon_part_labels,
+                        target,
+                        [source_labels[source_downsampled_indices]], ))
+
+
+
 
 def mesh_edit_interaction_points(interaction_points, edited_child_mesh, edited_parent_mesh, child_pose, parent_pose):
-
-    
     knns = interaction_points['knns']
     deltas = interaction_points['deltas']
     target_indices = interaction_points['target_indices']
@@ -126,13 +328,13 @@ def warp_interaction_points(interaction_points, child_model, parent_model, child
     target_indices = interaction_points['target_indices']
 
     # Warping the interaction points to the object shape
-    anchors = parent_model.to_pcd(parent_reconstruction_params)[
+    anchors = child_model.to_pcd(child_reconstruction_params)[
         knns
     ]
     targets_parent = np.mean(
         anchors + deltas, axis=1
     )
-    targets_child = child_model.to_pcd(child_reconstruction_params)[
+    targets_child = parent_model.to_pcd(parent_reconstruction_params)[
         target_indices
     ] 
 
@@ -142,10 +344,10 @@ def warp_interaction_points(interaction_points, child_model, parent_model, child
                                                     parent_reconstruction_params.quat)
 
     child_targets = utils.transform_pcd(targets_child,
-                                        child_transform)
+                                        parent_transform)
 
     parent_targets = utils.transform_pcd(targets_parent,
-                                         parent_transform)
+                                         child_transform)
 
     return {'parent':parent_targets, 'child': child_targets}
 
@@ -271,9 +473,15 @@ def infer_relpose(
     return trans_s_to_t
 
 def mesh_transform_interaction_points(interaction_points, child_mesh_vertices, parent_mesh_vertices):
-    print("Not yet implemented")
-    pass
+    raise NotImplementedError()
 
+
+
+
+"""
+Mesh loading helper files
+TODO: Move somewhere more appropriate
+"""
 def get_mug_mesh(pcl_id):
     obj_file_path = f"example_data/mug_meshes/{pcl_id}/models/model_normalized.obj"
     mesh = utils.trimesh_load_object(obj_file_path)

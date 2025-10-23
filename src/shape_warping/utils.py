@@ -128,6 +128,62 @@ class CanonShape:
             contact_points,
             pca,
         )
+    
+
+@dataclass
+class ConstraintShape:
+    """Does not warp. Only for use with the final alignment during part-based skill transfer."""
+
+    canonical_pcl: NPF32
+    center_transform: NPF32  # For saving the relative transform of parts
+    metadata: CanonShapeMetadata
+    pca: None
+
+    def to_pcd(self, obj_param: ObjParam) -> NPF32:
+        return self.constraint_pcd
+
+    def to_transformed_pcd(self, obj_param: ObjParam) -> NPF32:
+        pcd = self.to_pcd(obj_param)
+        trans = pos_quat_to_transform(obj_param.position, obj_param.quat)
+        return transform_pcd(pcd, trans)
+
+    def to_mesh(self, obj_param: ObjParam) -> trimesh.Trimesh:
+       raise NotImplementedError()
+    
+    def to_transformed_mesh(self, obj_param: ObjParam) -> trimesh.Trimesh:
+        raise NotImplementedError()
+    
+    @staticmethod
+    def from_part_reconstructions(
+        part_reconstructions: dict[str, NDArray[np.float32]],
+        part_transforms: List[NDArray[np.float32]],
+    ):
+        constraint_component_pcds = []
+        for part in part_reconstructions.keys():
+            constraint_component_pcds.append(
+                transform_pcd(
+                    part_reconstructions[part], part_transforms[part]
+                )
+            )
+
+        combined_pcl = np.concatenate(constraint_component_pcds, axis=0)
+        center_transform = pos_quat_to_transform(
+            np.mean(np.unique(trunc(combined_pcl), axis=0), axis=0),
+            np.array([0.0, 0.0, 0.0, 1.0]),
+        )
+        combined_pcl = transform_pcd(combined_pcl, np.linalg.inv(center_transform))
+
+        metadata = CanonShapeMetadata("none", "none", ["none"], None)
+        constraint_part = ConstraintShape( \
+            combined_pcl,
+            center_transform,
+            metadata,
+            None,
+        )
+        return constraint_part
+
+def trunc(values, decs=2):
+    return np.trunc(values * 10**decs) / (10**decs)
 
 
 def quat_to_rotm(quat: NPF64) -> NPF64:
@@ -194,6 +250,11 @@ def transform_pcd(pcd: NPF32, trans: NPF64, is_position: bool = True) -> NPF32:
     cloud = cloud[0:3, :].T
     return cloud
 
+def update_reconstruction_params_with_transform(demo_child_params, demo_transform):
+    child_transform = pos_quat_to_transform(demo_child_params.position, demo_child_params.quat)
+    new_child_transform = np.matmul(demo_transform, child_transform)
+    demo_child_params.position, demo_child_params.quat = transform_to_pos_quat(new_child_transform)
+    return demo_child_params
 
 def best_fit_transform(A: NPF32, B: NPF32) -> Tuple[NPF64, NPF64, NPF64]:
     """
@@ -572,6 +633,31 @@ def get_closest_point_pairs_thresh(
     return threshold_index_argwhere(dists, thresh)
 
 
+def nearest_neighbor_distances(pcl_1: NDArray, pcl_2: NDArray) -> NDArray:
+    """
+    Compute the distance from each point in pcl_1 to its nearest neighbor in pcl_2.
+
+    Args:
+        pcl_1: First point cloud of shape (N, 3)
+        pcl_2: Second point cloud of shape (M, 3)
+
+    Returns:
+        distances: Array of shape (N,) containing the distance from each point in pcl_1
+                   to its closest point in pcl_2
+    """
+    # Compute pairwise squared distances: shape (M, N)
+    # pcl_1[None] has shape (1, N, 3)
+    # pcl_2[:, None] has shape (M, 1, 3)
+    # Broadcasting gives (M, N, 3), then sum over last axis gives (M, N)
+    dists_squared = np.sum(np.square(pcl_1[None] - pcl_2[:, None]), axis=-1)
+
+    # Find minimum distance for each point in pcl_1 (axis 0 corresponds to pcl_2)
+    min_dists_squared = np.min(dists_squared, axis=0)
+
+    # Return Euclidean distances (take square root)
+    return np.sqrt(min_dists_squared)
+
+
 def center_pcl(pcl, return_centroid=False):
     pcl.shape[0]
     centroid = np.mean(pcl, axis=0)
@@ -582,7 +668,7 @@ def center_pcl(pcl, return_centroid=False):
         return pcl
 
 # Constructs relational descriptors between parts
-def get_part_labels(part_pairs):
+def get_part_labels(part_pairs, include_z = False):
     part_labels = {}
     for part_pair in part_pairs:
         ordered_part_names = list(part_pair.keys())
@@ -606,11 +692,20 @@ def get_part_labels(part_pairs):
                     np.ones_like(part_dists[part]),
                 )
             )
+    if include_z:
+        for part in part_labels.keys():
+            mean_z = np.mean(part_pairs[0][part][:, 2])
+            part_labels[part].append(np.where(
+                    part_pairs[0][part][:, 2]-mean_z < np.mean(part_pairs[0][part][:, 2]-mean_z) * .6,
+                    np.zeros_like(part_pairs[0][part][:, 2]),
+                    np.ones_like(part_pairs[0][part][:, 2]),
+                )
+            )
 
     return part_labels
 
 #Processed canon objects and then 
-def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True):
+def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True, include_z = False):
     #Generates adjacency between all listed parts if none provided
     if part_pairs is None:
         part_pairs = [{part_1: part_canonicals[part_1], part_2: part_canonicals[part_2]} for part_1, part_2 in itertools.combinations(part_names, r=2) if part_1 != part_2]
@@ -655,7 +750,7 @@ def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True):
         contact_pairs.append({p: contact_parts[part_names.index(p)] for p in pair.keys()})
 
     canon_labels = get_part_labels(
-        contact_pairs,
+        contact_pairs, include_z=include_z
     ) 
     return canon_labels
 
