@@ -18,33 +18,41 @@ def cost_batch_pt(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Calculate the one-sided Chamfer distance between two batches of point clouds in pytorch."""
     # B x N x K
     diff = torch.sqrt(
-        torch.sum(torch.square(source[:, :, None] - target[:, None, :]), dim=3
-        )
+        torch.sum(torch.square(source[:, :, None] - target[:, None, :]), dim=3)
     )
     diff_flat = diff.view(diff.shape[0] * diff.shape[1], diff.shape[2])
     c_flat = diff_flat[list(range(len(diff_flat))), torch.argmin(diff_flat, dim=1)]
     c = c_flat.view(diff.shape[0], diff.shape[1])
     return torch.mean(c, dim=1)
 
+
 # Mask by the provided labels. Only cost between shared labels counts
-def mask_and_cost_batch_pt(target, source_labels, source, target_labels, switch_sides=False):
+def mask_and_cost_batch_pt(
+    target, source_labels, source, target_labels, switch_sides=False
+):
     summed_cost = None
-    weights = [1,1]
+    weights = [1, 1]
 
     assert len(source_labels) == len(target_labels)
     for source_label, target_label in zip(source_labels, target_labels):
         for label, w in zip(np.unique(source_label), weights):
-            
             if switch_sides:
-                part_cost = cost_batch_pt(target[:, torch.from_numpy(target_label)==label], source[:, torch.from_numpy(source_label)==label], )
+                part_cost = cost_batch_pt(
+                    target[:, torch.from_numpy(target_label) == label],
+                    source[:, torch.from_numpy(source_label) == label],
+                )
             else:
-                part_cost = cost_batch_pt(source[:, torch.from_numpy(source_label)==label], target[:, torch.from_numpy(target_label)==label])
+                part_cost = cost_batch_pt(
+                    source[:, torch.from_numpy(source_label) == label],
+                    target[:, torch.from_numpy(target_label) == label],
+                )
             if summed_cost is None:
                 summed_cost = part_cost * w
             else:
                 summed_cost += part_cost * w
 
     return summed_cost
+
 
 class ObjectWarping:
     """Base class for inference of object shape, pose and scale with gradient descent."""
@@ -179,7 +187,6 @@ class ObjectWarping:
         scale_history = []
 
         for _ in range(self.n_steps):
-
             if self.n_samples is not None:
                 (
                     means_,
@@ -201,20 +208,21 @@ class ObjectWarping:
             # Saving optimization history for visualization
             try:
                 transform_history.append(
-                        (self.center_param.detach().cpu().numpy() + self.global_means,
+                    (
+                        self.center_param.detach().cpu().numpy() + self.global_means,
                         torch.bmm(orthogonalize(self.pose_param), self.initial_poses)
                         .detach()
                         .cpu()
                         .numpy(),
-                    ))
+                    )
+                )
             except IndexError:
                 transform_history.append(
-                        (self.center_param.detach().cpu().numpy() + self.global_means,
-                        yaw_to_rot_batch_pt(self.pose_param).detach()
-                        .cpu()
-                        .numpy()
-                        ,)
+                    (
+                        self.center_param.detach().cpu().numpy() + self.global_means,
+                        yaw_to_rot_batch_pt(self.pose_param).detach().cpu().numpy(),
                     )
+                )
             try:
                 latent_history.append(self.latent_param.detach().cpu().numpy())
             except AttributeError:
@@ -226,21 +234,46 @@ class ObjectWarping:
             else:
                 # Different procedures for pure pose optimization versus warping
                 # TODO Move to classes or kwarg format to clean up
-                if not hasattr(self, 'latent_param'):
+                if not hasattr(self, "latent_param"):
                     latent_param, initial_latents = None, None
                     if self.n_samples is None:
-                        cost = self.cost_function(self.pcd[None], new_pcd, self.canon_labels,)
+                        cost = self.cost_function(
+                            self.pcd[None],
+                            new_pcd,
+                            self.canon_labels,
+                        )
                     else:
-                        cost = self.cost_function(self.pcd[None], new_pcd, self.subsampled_canon_labels, )
+                        cost = self.cost_function(
+                            self.pcd[None],
+                            new_pcd,
+                            self.subsampled_canon_labels,
+                        )
                 else:
-                    latent_param, initial_latents = self.latent_param.data, self.initial_latents_pt
+                    latent_param, initial_latents = (
+                        self.latent_param.data,
+                        self.initial_latents_pt,
+                    )
                     if self.n_samples is None:
-                        cost = self.cost_function(self.pcd[None], new_pcd, self.canon_labels, latent_param, self.scale_param.data, initial_latents)
+                        cost = self.cost_function(
+                            self.pcd[None],
+                            new_pcd,
+                            self.canon_labels,
+                            latent_param,
+                            self.scale_param.data,
+                            initial_latents,
+                        )
                     else:
-                        cost = self.cost_function(self.pcd[None], new_pcd, self.subsampled_canon_labels, latent_param, self.scale_param.data, initial_latents)
-            
-            #Prevents local minima from warping objects to be giant (consequence of the one-sided chamfer metric)
-            #TODO move this out to a more generalized cost function structure
+                        cost = self.cost_function(
+                            self.pcd[None],
+                            new_pcd,
+                            self.subsampled_canon_labels,
+                            latent_param,
+                            self.scale_param.data,
+                            initial_latents,
+                        )
+
+            # Prevents local minima from warping objects to be giant (consequence of the one-sided chamfer metric)
+            # TODO move this out to a more generalized cost function structure
             if self.object_size_reg is not None:
                 size = torch.max(
                     torch.sqrt(torch.sum(torch.square(new_pcd), dim=-1)), dim=-1
@@ -257,14 +290,30 @@ class ObjectWarping:
             self.transform_history = utils.transform_history_to_mat(transform_history)
             self.latent_history = latent_history
             self.scale_history = scale_history
-        else: 
-            self.cost_history = np.concatenate([self.cost_history, cost_history], axis=1,)
-            self.transform_history = np.concatenate([self.transform_history, utils.transform_history_to_mat(transform_history)], axis=1, dtype=object)
+        else:
+            self.cost_history = np.concatenate(
+                [self.cost_history, cost_history],
+                axis=1,
+            )
+            self.transform_history = np.concatenate(
+                [
+                    self.transform_history,
+                    utils.transform_history_to_mat(transform_history),
+                ],
+                axis=1,
+                dtype=object,
+            )
             try:
-                self.latent_history = np.concatenate([self.latent_history, latent_history], axis=1,)
+                self.latent_history = np.concatenate(
+                    [self.latent_history, latent_history],
+                    axis=1,
+                )
             except np.exceptions.AxisError:
                 self.latent_history = latent_history
-            self.scale_history  = np.concatenate([self.scale_history, scale_history], axis=1,)
+            self.scale_history = np.concatenate(
+                [self.scale_history, scale_history],
+                axis=1,
+            )
 
         return self.assemble_output(cost)
 
@@ -309,7 +358,12 @@ class ObjectWarpingSE3Batch(ObjectWarping):
             )
 
         if initial_latents is None:
-            initial_latents_pt = torch.from_numpy(self.pca.components_ @ (-self.pca.mean_)).float().to(self.device).repeat(n_angles, 1)
+            initial_latents_pt = (
+                torch.from_numpy(self.pca.components_ @ (-self.pca.mean_))
+                .float()
+                .to(self.device)
+                .repeat(n_angles, 1)
+            )
             self.initial_latents_pt = initial_latents_pt
         else:
             initial_latents_pt = torch.tensor(
@@ -408,7 +462,6 @@ class ObjectWarpingSE2Batch(ObjectWarping):
         train_poses: bool = True,
         train_scales: bool = True,
     ):
-
         # Initial poses are yaw angles here.
         n_angles = len(initial_poses)
         initial_poses_pt = torch.tensor(
@@ -427,7 +480,12 @@ class ObjectWarpingSE2Batch(ObjectWarping):
             )
 
         if initial_latents is None:
-            initial_latents_pt = torch.from_numpy(self.pca.components_ @ (-self.pca.mean_)).float().to(self.device).repeat(n_angles, 1)
+            initial_latents_pt = (
+                torch.from_numpy(self.pca.components_ @ (-self.pca.mean_))
+                .float()
+                .to(self.device)
+                .repeat(n_angles, 1)
+            )
             self.initial_latents_pt = initial_latents_pt
             # initial_latents_pt = torch.zeros(
             #     (n_angles, self.pca.n_components),
@@ -634,6 +692,7 @@ class ObjectSE3Batch(ObjectWarping):
 
         return all_costs, all_new_pcds, all_parameters
 
+
 class ObjectSE2Batch(ObjectWarping):
     """Object pose gradient descent in SE2."""
 
@@ -705,7 +764,9 @@ class ObjectSE2Batch(ObjectWarping):
         )
         return (new_pcd,)
 
-    def subsample(self, num_samples: int) -> Tuple[
+    def subsample(
+        self, num_samples: int
+    ) -> Tuple[
         Optional[torch.Tensor],
         Optional[torch.Tensor],
         torch.Tensor,

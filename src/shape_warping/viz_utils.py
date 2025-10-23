@@ -17,7 +17,7 @@ def show_pcds_plotly(
     show_legend=True,
     markers=None,
     camera=None,
-    title= None,
+    title=None,
 ):
     colorscales = [
         "Plotly3",
@@ -86,12 +86,16 @@ def show_pcds_plotly(
     #     camera.eye = dict(x=6.28, y=0, z=1)
     # fig.update_layout(scene=layout, scene_camera=camera, showlegend=show_legend)
 
-    if title is not None: 
-        fig.update_layout(title={
-        'text': title,})
+    if title is not None:
+        fig.update_layout(
+            title={
+                "text": title,
+            }
+        )
 
     # fig.show()
     return fig
+
 
 # Show meshes from two dictionaries, formatted as {name: vertices}, {name: faces}
 def show_meshes_plotly(
@@ -222,7 +226,6 @@ def show_pcd_grid_plotly(
 
     for row in range(rows):
         for col in range(cols):
-
             name = names[row * cols + col]
 
             tmp = np.concatenate(list(pcls[name].values()), axis=0)
@@ -311,7 +314,6 @@ def show_pcds_video_animation_plotly(
     step_names: List[str],
     file_name: str,
 ):
-
     # Additional imports for video generation
     import moviepy.editor as mpy
     import io
@@ -416,11 +418,11 @@ def show_pcds_slider_animation_plotly(
     #     )
     # )
 
-    #camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
+    # camera = dict(eye=dict(x=1.25, y=0.0, z=0.0))
 
-    #fig.update_layout(scene_camera=camera)
+    # fig.update_layout(scene_camera=camera)
 
-    #Add traces, one for each slider step
+    # Add traces, one for each slider step
     for t, moving_pcl_frame in enumerate(moving_pcl_frames):
         for part in moving_pcl_frame.keys():
             fig.add_trace(
@@ -481,6 +483,7 @@ def show_pcds_slider_animation_plotly(
     fig.update_layout(sliders=sliders)
     return fig
 
+
 # Utility function to prevent circular imports
 def transform_pcd(pcd, trans, is_position: bool = True):
     n = pcd.shape[0]
@@ -490,6 +493,7 @@ def transform_pcd(pcd, trans, is_position: bool = True):
     cloud = np.dot(trans.astype(np.float32), cloud)
     cloud = cloud[0:3, :].T
     return cloud
+
 
 # Function for visualizing the warp optimization history
 def generate_slider_viz(
@@ -503,7 +507,12 @@ def generate_slider_viz(
     tf2_history = []
     for transform, cost in zip(warp.transform_history, warp.cost_history):
         best_trans = transform[best_idx]
-        best_transforms.append({part: transform_pcd(tf_pcl[part], best_trans.astype(float))for part in tf_pcl.keys()})
+        best_transforms.append(
+            {
+                part: transform_pcd(tf_pcl[part], best_trans.astype(float))
+                for part in tf_pcl.keys()
+            }
+        )
         step_names.append(f"COST: {cost[best_idx]}")
 
     if generate_animation:
@@ -523,14 +532,14 @@ def generate_slider_viz(
     )
     return slider_fig
 
+
 # Function for visualizing relational descriptors
 # TODO: Make more general rather than teapot-specific
-def visualize_teapot_relational_descriptors(part_pairs,
-                                            part_pcls,
-                                            pcl_labels,
-                                            title=None):
+def visualize_teapot_relational_descriptors(
+    part_pairs, part_pcls, pcl_labels, title=None
+):
     all_labeled_parts = {}
-    
+
     part_nums = {}
 
     # Unpacking labels and creating a named point cloud for every part-label combination
@@ -544,14 +553,14 @@ def visualize_teapot_relational_descriptors(part_pairs,
                 all_labeled_parts = (
                     all_labeled_parts
                     | {
-                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[part][
-                            pcl_labels[part][i] == 0
-                        ]
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[
+                            part
+                        ][pcl_labels[part][i] == 0]
                     }
                     | {
-                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[part][
-                            pcl_labels[part][i] == 1
-                        ]
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[
+                            part
+                        ][pcl_labels[part][i] == 1]
                     }
                 )
                 part_nums[part] += 1
@@ -560,14 +569,14 @@ def visualize_teapot_relational_descriptors(part_pairs,
                 all_labeled_parts = (
                     all_labeled_parts
                     | {
-                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[part][
-                            pcl_labels[part][0] == 0
-                        ]
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_0_{part}": part_pcls[
+                            part
+                        ][pcl_labels[part][0] == 0]
                     }
                     | {
-                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[part][
-                            pcl_labels[part][0] == 1
-                        ]
+                        f"{ordered_part_pair[0]}_{ordered_part_pair[1]}_1_{part}": part_pcls[
+                            part
+                        ][pcl_labels[part][0] == 1]
                     }
                 )
 
@@ -595,4 +604,3 @@ def visualize_teapot_relational_descriptors(part_pairs,
         "lid_spout_1_spout": "blues",
     }
     show_pcds_plotly(all_labeled_parts, colors=colors, title=title).show()
-

@@ -102,7 +102,7 @@ class CanonShape:
             pcd = data["canonical_obj"]
         else:
             pcd = data["canonical_obj_pcl"]
-            
+
         mesh_vertices = data["canonical_mesh_points"]
         mesh_faces = data["canonical_mesh_faces"]
         contact_points = None
@@ -128,7 +128,7 @@ class CanonShape:
             contact_points,
             pca,
         )
-    
+
 
 @dataclass
 class ConstraintShape:
@@ -148,11 +148,11 @@ class ConstraintShape:
         return transform_pcd(pcd, trans)
 
     def to_mesh(self, obj_param: ObjParam) -> trimesh.Trimesh:
-       raise NotImplementedError()
-    
+        raise NotImplementedError()
+
     def to_transformed_mesh(self, obj_param: ObjParam) -> trimesh.Trimesh:
         raise NotImplementedError()
-    
+
     @staticmethod
     def from_part_reconstructions(
         part_reconstructions: dict[str, NDArray[np.float32]],
@@ -161,9 +161,7 @@ class ConstraintShape:
         constraint_component_pcds = []
         for part in part_reconstructions.keys():
             constraint_component_pcds.append(
-                transform_pcd(
-                    part_reconstructions[part], part_transforms[part]
-                )
+                transform_pcd(part_reconstructions[part], part_transforms[part])
             )
 
         combined_pcl = np.concatenate(constraint_component_pcds, axis=0)
@@ -174,13 +172,14 @@ class ConstraintShape:
         combined_pcl = transform_pcd(combined_pcl, np.linalg.inv(center_transform))
 
         metadata = CanonShapeMetadata("none", "none", ["none"], None)
-        constraint_part = ConstraintShape( \
+        constraint_part = ConstraintShape(
             combined_pcl,
             center_transform,
             metadata,
             None,
         )
         return constraint_part
+
 
 def trunc(values, decs=2):
     return np.trunc(values * 10**decs) / (10**decs)
@@ -217,25 +216,28 @@ def transform_to_pos_rot(trans: NPF64) -> Tuple[NPF64, NPF64]:
     # Just making sure.
     return pos.astype(np.float64), rot.astype(np.float64)
 
+
 def euler_to_quat(euler_rot):
     from scipy.spatial.transform import Rotation
 
     # Create a rotation object from Euler angles specifying axes of rotation
-    rot = Rotation.from_euler('xyz', euler_rot)
+    rot = Rotation.from_euler("xyz", euler_rot)
 
     # Convert to quaternions and print
     rot_quat = rot.as_quat()
     return rot_quat
 
+
 def euler_to_matrix(euler_rot):
     from scipy.spatial.transform import Rotation
 
     # Create a rotation object from Euler angles specifying axes of rotation
-    rot = Rotation.from_euler('xyz', euler_rot)
+    rot = Rotation.from_euler("xyz", euler_rot)
 
     # Convert to quaternions and print
     rot_mat = rot.as_matrix()
     return rot_mat
+
 
 def random_quat():
     return Rotation.random().as_quat()
@@ -250,11 +252,17 @@ def transform_pcd(pcd: NPF32, trans: NPF64, is_position: bool = True) -> NPF32:
     cloud = cloud[0:3, :].T
     return cloud
 
+
 def update_reconstruction_params_with_transform(demo_child_params, demo_transform):
-    child_transform = pos_quat_to_transform(demo_child_params.position, demo_child_params.quat)
+    child_transform = pos_quat_to_transform(
+        demo_child_params.position, demo_child_params.quat
+    )
     new_child_transform = np.matmul(demo_transform, child_transform)
-    demo_child_params.position, demo_child_params.quat = transform_to_pos_quat(new_child_transform)
+    demo_child_params.position, demo_child_params.quat = transform_to_pos_quat(
+        new_child_transform
+    )
     return demo_child_params
+
 
 def best_fit_transform(A: NPF32, B: NPF32) -> Tuple[NPF64, NPF64, NPF64]:
     """
@@ -667,27 +675,36 @@ def center_pcl(pcl, return_centroid=False):
     else:
         return pcl
 
+
 # Constructs relational descriptors between parts
-def get_part_labels(part_pairs, include_z = False):
+def get_part_labels(part_pairs, include_z=False):
     part_labels = {}
     for part_pair in part_pairs:
         ordered_part_names = list(part_pair.keys())
         ordered_part_names.sort()
 
         dists = np.sum(
-            np.square(part_pair[ordered_part_names[0]][None] - part_pair[ordered_part_names[1]][:, None]),
+            np.square(
+                part_pair[ordered_part_names[0]][None]
+                - part_pair[ordered_part_names[1]][:, None]
+            ),
             axis=-1,
         )
-        
-        part_dists = {ordered_part_names[i]: np.min(dists, axis=i) for i in range(len(ordered_part_names))} 
+
+        part_dists = {
+            ordered_part_names[i]: np.min(dists, axis=i)
+            for i in range(len(ordered_part_names))
+        }
 
         # 0 where parts are near each other, 1 otherwise
         for part in ordered_part_names:
             if part not in part_labels.keys():
                 part_labels[part] = []
             min_dist = np.min(part_dists[part])
-            part_labels[part].append(np.where(
-                    part_dists[part]-min_dist < np.mean(part_dists[part]-min_dist) * .6,
+            part_labels[part].append(
+                np.where(
+                    part_dists[part] - min_dist
+                    < np.mean(part_dists[part] - min_dist) * 0.6,
                     np.zeros_like(part_dists[part]),
                     np.ones_like(part_dists[part]),
                 )
@@ -695,8 +712,10 @@ def get_part_labels(part_pairs, include_z = False):
     if include_z:
         for part in part_labels.keys():
             mean_z = np.mean(part_pairs[0][part][:, 2])
-            part_labels[part].append(np.where(
-                    part_pairs[0][part][:, 2]-mean_z < np.mean(part_pairs[0][part][:, 2]-mean_z) * .6,
+            part_labels[part].append(
+                np.where(
+                    part_pairs[0][part][:, 2] - mean_z
+                    < np.mean(part_pairs[0][part][:, 2] - mean_z) * 0.6,
                     np.zeros_like(part_pairs[0][part][:, 2]),
                     np.ones_like(part_pairs[0][part][:, 2]),
                 )
@@ -704,11 +723,18 @@ def get_part_labels(part_pairs, include_z = False):
 
     return part_labels
 
-#Processed canon objects and then 
-def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True, include_z = False):
-    #Generates adjacency between all listed parts if none provided
+
+# Processed canon objects and then
+def get_canon_labels(
+    part_pairs, part_canonicals, part_names, rescale=True, include_z=False
+):
+    # Generates adjacency between all listed parts if none provided
     if part_pairs is None:
-        part_pairs = [{part_1: part_canonicals[part_1], part_2: part_canonicals[part_2]} for part_1, part_2 in itertools.combinations(part_names, r=2) if part_1 != part_2]
+        part_pairs = [
+            {part_1: part_canonicals[part_1], part_2: part_canonicals[part_2]}
+            for part_1, part_2 in itertools.combinations(part_names, r=2)
+            if part_1 != part_2
+        ]
 
     # Doing adjustment to the centered/scaled parts to accurately approximate these labels
     part_adjustment = {
@@ -719,40 +745,43 @@ def get_canon_labels(part_pairs, part_canonicals, part_names, rescale=True, incl
     }
 
     # Realigning canonical parts - TODO make less bespoke
-    if rescale: 
+    if rescale:
         ten_scaled_parts = scale_points_circle(
             [part_canonicals[part].canonical_pcl for part in part_names], base_scale=10
         )
 
         adjusted_part_canon = {
-            part_names[i]: transform_pcd(ten_scaled_parts[i], part_adjustment[part_names[i]])
+            part_names[i]: transform_pcd(
+                ten_scaled_parts[i], part_adjustment[part_names[i]]
+            )
             for i in range(len(part_names))
         }
 
         contact_parts = scale_points_circle(
             [adjusted_part_canon[part] for part in part_names], base_scale=0.1
         )
-    else: 
+    else:
         all_parts = [part_canonicals[part].canonical_pcl for part in part_names]
         adjusted_part_canon = {
             part_names[i]: transform_pcd(all_parts[i], part_adjustment[part_names[i]])
             for i in range(len(part_names))
         }
-        contact_parts =  [adjusted_part_canon[part] for part in part_names]
+        contact_parts = [adjusted_part_canon[part] for part in part_names]
 
-     #TODO fix canon teapot scaling
-    if part_names[0] == 'body':
-        contact_parts[0] = scale_points_circle([contact_parts[0]], base_scale=.075)[0]
+    # TODO fix canon teapot scaling
+    if part_names[0] == "body":
+        contact_parts[0] = scale_points_circle([contact_parts[0]], base_scale=0.075)[0]
 
-    #Recreating the part pairs with the correct relative poses
+    # Recreating the part pairs with the correct relative poses
     contact_pairs = []
     for pair in part_pairs:
-        contact_pairs.append({p: contact_parts[part_names.index(p)] for p in pair.keys()})
+        contact_pairs.append(
+            {p: contact_parts[part_names.index(p)] for p in pair.keys()}
+        )
 
-    canon_labels = get_part_labels(
-        contact_pairs, include_z=include_z
-    ) 
+    canon_labels = get_part_labels(contact_pairs, include_z=include_z)
     return canon_labels
+
 
 # Utility function for visualizing the optimization process
 def transform_history_to_mat(tf_history):

@@ -122,7 +122,7 @@ def viz_part_models(warp_files, part_names):
             html.Div(
                 in_div,
                 style={
-                    "width": f"{int(100/len(part_names)) - 1}%",
+                    "width": f"{int(100 / len(part_names)) - 1}%",
                     "display": "inline-block",
                 },
             )
