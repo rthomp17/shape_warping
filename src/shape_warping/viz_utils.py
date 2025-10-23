@@ -44,11 +44,6 @@ def show_pcds_plotly(
     data = []
     for idx, key in enumerate(pcds.keys()):
         v = pcds[key]
-        print(v)
-        print(v.shape)
-        print(v[:, 0])
-        print(v[:, 1])
-        print(v[:, 2])
         if colors is not None:
             colorscale = colors[key]
         else:

@@ -53,6 +53,57 @@ def mask_and_cost_batch_pt(
 
     return summed_cost
 
+def get_relational_labels(part_pcds, warp_models, part_relationships, include_z=False):
+    """
+    Helper function for getting the relational labels that help with shape warping.
+    """
+
+    # These are for improving the results of shape warping, but aren't used for the final pose inference
+    child_relational_labels = utils.get_part_labels(
+        [
+            {p: part_pcds["child"][p] for p in relation}
+            for relation in part_relationships["child"]
+        ],
+        include_z=include_z,
+    )
+
+    parent_relational_labels = utils.get_part_labels(
+        [
+            {p: part_pcds["parent"][p] for p in relation}
+            for relation in part_relationships["parent"]
+        ],
+        include_z=include_z,
+    )
+
+    canon_child_relational_labels = utils.get_canon_labels(
+        [
+            {p: warp_models["child"][p].canonical_pcl for p in relation}
+            for relation in part_relationships["child"]
+        ],
+        warp_models["child"],
+        list(part_pcds["child"].keys()),
+        rescale=False,
+        include_z=include_z,
+    )
+
+    canon_parent_relational_labels = utils.get_canon_labels(
+        [
+            {p: warp_models["parent"][p].canonical_pcl for p in relation}
+            for relation in part_relationships["parent"]
+        ],
+        warp_models["parent"],
+        list(part_pcds["parent"].keys()),
+        rescale=False,
+        include_z=include_z,
+    )
+
+    return (
+        child_relational_labels,
+        parent_relational_labels,
+        canon_child_relational_labels,
+        canon_parent_relational_labels,
+    )
+
 
 class ObjectWarping:
     """Base class for inference of object shape, pose and scale with gradient descent."""
@@ -973,3 +1024,87 @@ def yaw_to_rot_batch_pt(yaw: torch.Tensor) -> torch.Tensor:
         ],
         dim=1,
     )
+
+#TODO: Add tags for lambda, scale, and shape regularization
+#TODO: Add warping kwargs structure to clean up the code    
+def reconstruct_part_shape(
+    warp_model,
+    target_pcd,
+    target_labels,
+    canon_labels,
+    inference_kwargs,
+    viz=False,
+    warp_mode="SE3",
+    size_reg=0.2,
+):
+    """
+    Full pipelne for reconstructing the shape of a part from a target point cloud.
+    """
+    cost_function = (
+        lambda source,
+        test_object,
+        canon_part_labels,
+        latent,
+        scale,
+        initial: mask_and_cost_batch_pt(
+            test_object,
+            target_labels,
+            source,
+            canon_part_labels,
+        )
+    )
+    if warp_mode == "SE3":
+        warp = ObjectWarpingSE3Batch(
+            warp_model,
+            target_pcd,
+            canon_labels=canon_labels,
+            cost_function=cost_function,
+            device="cuda",
+            lr=1e-2,
+            n_steps=100,
+            object_size_reg=size_reg,
+        )
+
+        reconstructed_pcd, _, warp_params = warp_to_pcd_se3(
+            warp,
+            n_angles=5,
+            n_batches=12,
+            inference_kwargs=inference_kwargs,
+        )
+    elif warp_mode == "SE2":
+        warp = ObjectWarpingSE2Batch(
+            warp_model,
+            target_pcd,
+            canon_labels=canon_labels,
+            cost_function=cost_function,
+            device="cuda",
+            lr=1e-2,
+            n_steps=100,
+            object_size_reg=0.2,
+        )
+        reconstructed_pcd, _, warp_params = warp_to_pcd_se2(
+            warp,
+            n_angles=5,
+            n_batches=12,
+            inference_kwargs=inference_kwargs,
+        )
+    else:
+        raise NotImplementedError()
+
+    if viz:
+        for i, label in enumerate(target_labels):
+            fig = viz_utils.show_pcds_plotly(
+                {
+                    f"label_{i}_target_0": target_pcd[label == 0],
+                    f"label_{i}_target_1": target_pcd[label == 1],
+                    f"label_{i}_reconstruction_0": reconstructed_pcd[
+                        canon_labels[i] == 0
+                    ],
+                    f"label_{i}_reconstruction_1": reconstructed_pcd[
+                        canon_labels[i] == 1
+                    ],
+                }
+            )
+            fig.show()
+
+    return reconstructed_pcd, warp_params

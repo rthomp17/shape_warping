@@ -69,6 +69,58 @@ def convert_meshes_to_pointclouds(
     return pcds
 
 
+def get_relational_labels(part_pcds, warp_models, part_relationships, include_z=False):
+    """
+    Helper function for getting the relational labels that help with shape warping.
+    """
+
+    # These are for improving the results of shape warping, but aren't used for the final pose inference
+    child_relational_labels = utils.get_part_labels(
+        [
+            {p: part_pcds["child"][p] for p in relation}
+            for relation in part_relationships["child"]
+        ],
+        include_z=include_z,
+    )
+
+    parent_relational_labels = utils.get_part_labels(
+        [
+            {p: part_pcds["parent"][p] for p in relation}
+            for relation in part_relationships["parent"]
+        ],
+        include_z=include_z,
+    )
+
+    canon_child_relational_labels = utils.get_canon_labels(
+        [
+            {p: warp_models["child"][p].canonical_pcl for p in relation}
+            for relation in part_relationships["child"]
+        ],
+        warp_models["child"],
+        list(part_pcds["child"].keys()),
+        rescale=False,
+        include_z=include_z,
+    )
+
+    canon_parent_relational_labels = utils.get_canon_labels(
+        [
+            {p: warp_models["parent"][p].canonical_pcl for p in relation}
+            for relation in part_relationships["parent"]
+        ],
+        warp_models["parent"],
+        list(part_pcds["parent"].keys()),
+        rescale=False,
+        include_z=include_z,
+    )
+
+    return (
+        child_relational_labels,
+        parent_relational_labels,
+        canon_child_relational_labels,
+        canon_parent_relational_labels,
+    )
+
+
 def fit_parts_to_shape_models(
     part_pcds: Dict[str, NDArray],
     shape_models: Dict[str, utils.CanonShape],

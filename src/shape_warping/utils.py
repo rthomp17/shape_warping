@@ -529,7 +529,7 @@ def sst_pick_canonical(known_pts: List[NDArray[np.float32]]) -> int:
 
     overall_costs = []
     for i in range(len(known_pts)):
-        print(i)
+        print(f"Testing object {i}")
         cost_per_target = []
         for j in range(len(known_pts)):
             if i != j:

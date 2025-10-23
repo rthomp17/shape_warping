@@ -5,6 +5,19 @@ from shape_warping import utils, viz_utils
 import pickle
 import itertools
 
+# For shape warping and feature transfer
+WARPING_INFERENCE_KWARGS = {
+    "train_latents": True,
+    "train_poses": True,
+    "train_centers": True,
+}
+
+# For the final pose inference, after warping is done
+ALIGNMENT_ONLY_INFERENCE_KWARGS = {
+    "train_poses": True,
+    "train_centers": True,
+}
+
 
 class TestScene:
     max_points_per_object = 2000
@@ -95,6 +108,8 @@ class DemoScene:
         start_poses,
         final_poses,
         interaction_points=None,
+        warp_models=None,
+        reconstruction_params=None
     ):
         self.initial_pcds = initial_pcds
         self.segmented_initial_pcds = segmented_initial_pcds
@@ -134,6 +149,8 @@ class DemoScene:
             "parent": self.parent_part_relationships,
             "child": self.child_part_relationships,
         }
+        self.warp_models = warp_models
+        self.reconstruction_params = reconstruction_params
 
     def show_demo(self):
         # Just to make visualization easier
@@ -267,6 +284,17 @@ class DemoScene:
             interaction_points = demo["interaction_points"]
         else:
             interaction_points = None
+
+
+        if "child_warp_model" in demo.keys():
+            warp_models = {'child': demo['child_warp_model'], 'parent': demo['parent_warp_model']}
+        else:
+            warp_models = None
+        if 'child_reconstruction_params' in demo.keys():
+            reconstruction_params = {'child': demo['child_reconstruction_params'], 'parent': demo['parent_reconstruction_params']}
+        else:
+            reconstruction_params = None
+
         return DemoScene(
             initial_pcds,
             segmented_initial_pcds,
@@ -275,6 +303,8 @@ class DemoScene:
             start_poses,
             final_poses,
             interaction_points,
+            warp_models,
+            reconstruction_params
         )
 
 
@@ -313,11 +343,6 @@ def get_interaction_points(
     if mesh_vertices_only:
         source_pcd = source_pcd[: len(canon_source_obj.mesh_vertices)]
         target_pcd = target_pcd[: len(canon_target_obj.mesh_vertices)]
-
-    # viz_utils.show_pcds_plotly({
-    #     "pcd": source_pcd,
-    #     "warp": target_pcd
-    # }, center=False)
 
     dist = np.sqrt(np.sum(np.square(source_pcd[:, None] - target_pcd[None]), axis=-1))
     print("@@", np.min(dist))
@@ -362,6 +387,125 @@ def get_interaction_points(
 
     return knns, deltas, i_2
 
+
+def get_demo_interaction_points_by_parts(demo, warp_models, load_from_cache=False,viz=False):
+    all_part_pairs = itertools.product(demo.parent_part_names, demo.child_part_names)
+
+    # Just for shape warping purposes
+    (
+        child_relational_labels,
+        parent_relational_labels,
+        canon_child_relational_labels,
+        canon_parent_relational_labels,
+    ) = get_relational_labels(
+        demo.segmented_initial_pcds,
+        warp_models,
+        demo.part_relationships,
+        include_z=True,
+    )
+
+    if viz:
+        fig = viz_utils.show_pcds_plotly(
+            {
+                f"child_{part}_0": demo.segmented_final_pcds["child"][part][child_relational_labels[part][0] == 0] for part in demo.child_part_names} |
+
+               {f"parent_{part}_0": demo.segmented_final_pcds["parent"][part][parent_relational_labels[part][0] == 0] for part in demo.parent_part_names}
+        )
+        fig.show()
+
+        fig = viz_utils.show_pcds_plotly(
+            {
+                f"canon_child_{part}_0": warp_models["child"][part].canonical_pcl[canon_child_relational_labels[part][0] == 0] for part in demo.child_part_names} |
+                {f"canon_parent_{part}_0": warp_models["parent"][part].canonical_pcl[canon_parent_relational_labels[part][0] == 0] for part in demo.parent_part_names
+            }
+        )
+        fig.show()
+
+    if load_from_cache:
+        # Load reconstructions from file to save time, useful when debugging
+        demo_reconstruction_params = pickle.load(open("demo_reconstruction_params.pkl", "rb"))
+        demo_reconstructions = {"child": {part: warp_models['child'][part].to_transformed_pcd(demo_reconstruction_params['child'][part]) for part in demo.child_part_names}, "parent": {part: warp_models['parent']['part'].to_transformed_pcd(demo_reconstruction_params['parent'][part]) for part in demo.parent_part_names}}
+    else:
+        demo_reconstruction_params = {"child": {}, "parent": {}}
+        demo_reconstructions = {"child": {}, "parent": {}}
+        for part in demo.parent_part_names:
+            part_reconstruction, part_params = reconstruct_part_shape(
+                warp_models["parent"][part],
+                demo.segmented_initial_pcds["parent"][part],
+                parent_relational_labels[part],
+                canon_labels=canon_parent_relational_labels[part],
+                inference_kwargs=WARPING_INFERENCE_KWARGS,
+                warp_mode="SE3",
+                viz=True,
+            )
+            demo_reconstruction_params["parent"][part] = part_params
+            demo_reconstructions["parent"][part] = part_reconstruction
+
+        for part in demo.child_part_names:
+            part_reconstruction, part_params = reconstruct_part_shape(
+                warp_models["child"][part],
+                demo.segmented_initial_pcds["child"][part],
+                child_relational_labels[part],
+                canon_labels=canon_child_relational_labels[part],
+                inference_kwargs=WARPING_INFERENCE_KWARGS,
+                warp_mode="SE3",
+                viz=True,
+            )
+
+            part_params = utils.update_reconstruction_params_with_transform(
+                part_params, demo.child_transform
+            )
+            part_reconstruction = warp_models["child"][part].to_transformed_pcd(part_params)
+
+            demo_reconstruction_params["child"][part] = part_params
+            demo_reconstructions["child"][part] = part_reconstruction
+
+    part_pair_interaction_points = {}
+    for part_pair in all_part_pairs:
+        parent_part, child_part = part_pair
+
+        if parent_part not in part_pair_interaction_points.keys():
+            part_pair_interaction_points[parent_part] = {}
+
+        knns, deltas, i_2 = get_interaction_points(
+            warp_models["child"][child_part],
+            demo_reconstruction_params["child"][child_part],
+            warp_models["parent"][parent_part],
+            demo_reconstruction_params["parent"][parent_part],
+            mesh_vertices_only=False,
+        )
+
+        part_pair_interaction_points[parent_part][child_part] = {
+            "knns": knns,
+            "deltas": deltas,
+            "target_indices": i_2,
+        }
+
+        warped_part_pair_interaction_points = warp_interaction_points(
+            part_pair_interaction_points[parent_part][child_part],
+            warp_models["child"][child_part],
+            warp_models["parent"][parent_part],
+            demo_reconstruction_params["child"][child_part],
+            demo_reconstruction_params["parent"][parent_part],
+        )
+        if viz:
+            fig = viz_utils.show_pcds_plotly(
+                {
+                    "child": demo.segmented_final_pcds["child"][child_part],
+                    "parent": demo.segmented_final_pcds["parent"][parent_part],
+                    "child_reconstruction": demo_reconstructions["child"][child_part],
+                    "parent_reconstruction": demo_reconstructions["parent"][parent_part],
+                    "child_interaction_points": warped_part_pair_interaction_points[
+                        "child"
+                    ],
+                    "parent_interaction_points": warped_part_pair_interaction_points[
+                        "parent"
+                    ],
+                }
+            )
+            fig.show()
+
+    return part_pair_interaction_points
 
 def construct_part_alignment_objective(alignment_constraint_pcd, source_pcd_parts):
     constraint_component_pcds = alignment_constraint_pcd.component_pcds
