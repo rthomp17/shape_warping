@@ -1,7 +1,7 @@
 # Code by Ondrej Biza and Skye Thompson
 
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -29,10 +29,10 @@ NPF64 = NDArray[np.float64]
 class ObjParam:
     """Object shape and pose parameters."""
 
-    position: NPF64 = np.array([0.0, 0.0, 0.0])
-    quat: NPF64 = np.array([0.0, 0.0, 0.0, 1.0])
+    position: NPF64 = field(default_factory=lambda: np.array([0.0, 0.0, 0.0]))
+    quat: NPF64 = field(default_factory=lambda: np.array([0.0, 0.0, 0.0, 1.0]))
     latent: Optional[NPF32] = None
-    scale: NPF32 = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+    scale: NPF32 = field(default_factory=lambda: np.array([1.0, 1.0, 1.0], dtype=np.float32))
 
     def get_transform(self) -> NPF64:
         return pos_quat_to_transform(self.position, self.quat)
