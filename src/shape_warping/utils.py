@@ -92,12 +92,9 @@ class CanonShape:
         # The mesh vertices are assumed to be at the start of the canonical_pcd.
         vertices = pcd[: len(self.mesh_vertices)]
         return trimesh.Trimesh(vertices, self.mesh_faces)
-
+    
     @staticmethod
-    def from_pickle(load_path: str) -> "CanonShape":
-        with open(load_path, "rb") as f:
-            data = pickle.load(f)
-
+    def from_dict(data):
         if "canonical_obj" in data.keys():
             pcd = data["canonical_obj"]
         else:
@@ -128,6 +125,16 @@ class CanonShape:
             contact_points,
             pca,
         )
+
+    @staticmethod
+    def from_pickle(load_path: str) -> "CanonShape":
+        with open(load_path, "rb") as f:
+            data = pickle.load(f)
+        return CanonShape.from_dict(data)
+
+        
+    
+
 
 
 @dataclass
