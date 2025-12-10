@@ -3,7 +3,80 @@ import os.path as osp
 import pickle
 from scipy.spatial.transform import Rotation
 import trimesh
+import json
 from shape_warping import viz_utils
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
+
+def to_json_friendly(obj):
+    """
+    Convert a dictionary (or other object) to a JSON-friendly format.
+
+    Handles conversion of:
+    - PyTorch tensors -> lists
+    - NumPy arrays -> lists
+    - NumPy scalars -> Python native types
+    - Nested dictionaries and lists (recursive)
+    - Sets and tuples -> lists
+    - Other common types
+
+    Args:
+        obj: The object to convert (dict, list, tensor, array, etc.)
+
+    Returns:
+        A JSON-serializable version of the input object
+    """
+    # Handle None
+    if obj is None:
+        return None
+
+    # Handle PyTorch tensors
+    if TORCH_AVAILABLE and isinstance(obj, torch.Tensor):
+        return obj.detach().cpu().numpy().tolist()
+
+    # Handle NumPy arrays
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+
+    # Handle NumPy scalar types
+    if isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+
+    # Handle NumPy bool
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+
+    # Handle dictionaries recursively
+    if isinstance(obj, dict):
+        return {key: to_json_friendly(value) for key, value in obj.items()}
+
+    # Handle lists and tuples recursively
+    if isinstance(obj, (list, tuple)):
+        return [to_json_friendly(item) for item in obj]
+
+    # Handle sets
+    if isinstance(obj, set):
+        return [to_json_friendly(item) for item in obj]
+
+    # Handle basic JSON-serializable types
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+
+    # For objects with custom attributes, try to convert to string
+    # This handles objects that might not be directly serializable
+    try:
+        # Try to see if it's already JSON serializable
+        import json
+        json.dumps(obj)
+        return obj
+    except (TypeError, ValueError):
+        # If not serializable, convert to string representation
+        return str(obj)
 
 
 def transform_pcd(pcd, trans, is_position):
@@ -170,12 +243,18 @@ def get_object_meshes(demo):
     )
 
 
+
+
+
+
 if __name__ == "__main__":
     # Load from the pickle file
     demo_path = osp.join(
-        "example_data", "mug_on_rack_demos", "mug_on_tree_demonstration.pkl"
+        "example_data", "mug_on_rack_demos", "mug_on_tree_demonstration_np_back_compatible.pkl"
     )
     demo = pickle.load(open(demo_path, "rb"))
+
+
     demo["child_part_names"] = ["cup", "handle"]
     demo["parent_part_names"] = ["trunk", "branch"]
 
@@ -207,6 +286,7 @@ if __name__ == "__main__":
     # Reconstructed transform from initial mug placement to the final mug placement in the world_frame
     relative_transform_rack_to_mug = get_relative_transform_interaction_points(demo)
 
+    print(relative_transform_rack_to_mug)
     # Ground truth transform from initial mug placement to the final mug placement in the world_frame
     final_transform = pos_quat_to_transform(
         final_poses["child"][:3], final_poses["child"][3:]
@@ -214,4 +294,5 @@ if __name__ == "__main__":
         pos_quat_to_transform(start_poses["child"][:3], start_poses["child"][3:])
     )
 
+    print(final_transform)
     # trans_cs_to_ct is the mug's position in the estimated rack frame

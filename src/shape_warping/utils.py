@@ -94,6 +94,18 @@ class CanonShape:
         return trimesh.Trimesh(vertices, self.mesh_faces)
     
     @staticmethod
+    def to_dict(self):
+        return {
+            "canonical_pcl": self.canonical_pcl,
+            "mesh_vertices": self.mesh_vertices,
+            "mesh_faces": self.mesh_faces,
+            "center_transform": self.center_transform,
+            "metadata": self.metadata,
+            "contact_points": self.contact_points,
+            "pca": self.pca,
+        }
+    
+    @staticmethod
     def from_dict(data):
         if "canonical_obj" in data.keys():
             pcd = data["canonical_obj"]
